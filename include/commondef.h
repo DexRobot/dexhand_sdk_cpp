@@ -83,18 +83,17 @@ enum class SysErrorCode
     NONE = 0,
     ADAPTER_NA,
     CONN_LOST,
+    COMM_TIMEOUT,
 };
 
 enum MotorControlMode
 {
     ZERO_TORQUE_MODE = 0x00,
-    CURRENT_CONTROL_MODE = 0x11,
-    SPEED_CONTROL_MODE = 0x22,
     HALL_POSITION_CONTROL_MODE = 0x33,
-    CASCADED_PID_CONTROL_MODE = 0x44,
     HALL_POSLIMIT_CONTROL_MODE = 0x55,
-    CASCADED_MIT_CONTROL_MODE = 0x66,
-    CASCADED_IMP_CONTROL_MODE = 0x77,
+    CASCADED_PID_CONTROL_MODE  = 0x44,
+    CASCADED_MIT_CONTROL_MODE  = 0x66,
+    CASCADED_IMP_CONTROL_MODE  = 0x77,
 };
 
 enum ErrorType
@@ -149,21 +148,21 @@ enum class JointMotor : uint8_t
     ALL = 0x03
 };
 
-enum JointID
+enum class JointID : uint8_t
 {
-    UNKNOWN = -1,
-    ThumbProximal = 0,
-    ThumbDistal,
-    PalmRoll,
-    PalmSplit,
-    IndexProximal,
-    IndexDistal,
-    MiddleProximal,
-    MiddleDistal,
-    RingProximal,
-    RingDistal,
-    PinkyProximal,
-    PinkyDistal,
+    NONE = 0xFF,
+    TH_DIP = 0,
+    TH_MCP,
+    TH_ROT,
+    FF_SPR,
+    FF_DIP,
+    FF_MCP,
+    MF_DIP,
+    MF_MCP,
+    RF_DIP,
+    RF_MCP,
+    LF_DIP,
+    LF_MCP,
 };
 
 class DX21StatusRxData

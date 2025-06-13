@@ -1,5 +1,12 @@
 #include <iostream>
 #include <cstring>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "DexHand.h"
 #include "StringUtils.h"
 
@@ -8,12 +15,91 @@
 using namespace DexRobot;
 using namespace DexRobot::Dex021;
 
-void CallbackFunc(DexRobot::DX21StatusRxData * statusRx)
+/// global variables for socket connections
+int gConnSockFd = -1;
+std::string gHostAddr;
+uint16_t gHostPort;
+bool gSrvrConnected = false;
+
+void InitSocket();
+void SendToSocket(const char * frame, size_t frameSize, size_t frameCnt=1);
+
+
+void signalHandler(int signum)
+{
+    std::cout << "\nGet Message: " << signum << std::endl;
+
+    if (signum == SIGINT) {
+        std::cout << "Closing socket..." << std::endl;
+        if(gConnSockFd != -1)
+            shutdown(gConnSockFd, SHUT_WR);
+        
+        exit(0);
+    }
+    else if (signum == SIGABRT) {
+        std::cout << "Closing socket..." << std::endl;
+        if(gConnSockFd != -1)
+            shutdown(gConnSockFd, SHUT_WR);
+        
+        exit(signum);
+    }
+}
+
+
+void InitSocket()
+{
+    gConnSockFd = socket(AF_INET, SOCK_STREAM, 0);
+    if(gConnSockFd == -1)
+    {
+        fprintf(stderr, "Create socket descriptor failed. Data will not be sent\n");
+        return;
+    }
+
+    struct sockaddr_in srvr_addr;
+    memset((char *)&srvr_addr, 0, sizeof(struct sockaddr_in));
+
+    srvr_addr.sin_family = AF_INET;
+    srvr_addr.sin_addr.s_addr = inet_addr(gHostAddr.c_str());
+    srvr_addr.sin_port = htons(gHostPort);
+
+    gSrvrConnected = (0 == ::connect(gConnSockFd, (const struct sockaddr *)&srvr_addr, sizeof(srvr_addr)));
+    if(gSrvrConnected)
+    {
+        fprintf(stderr, "Socket connection is not able to be established, data will not be sent\n");
+    }
+}
+
+
+void SendToSocket(const char * frame, size_t frameSize)
+{
+    if(!gSrvrConnected || gConnSockFd == -1)
+    {
+        std::cout << "Socket not available, skip sending data" << std::endl;
+        return;
+    }
+
+    size_t buffLen = frameSize;
+
+    ssize_t sentLen = send(gConnSockFd, frame, buffLen, 0);
+    if(sentLen < 0)
+    {
+        shutdown(gConnSockFd, SHUT_WR);
+        gConnSockFd = -1;
+        gSrvrConnected = false;
+
+        if(sentLen == -1)
+        {
+            fprintf(stderr, "Connection closed by peer\n");
+        }
+    }
+}
+
+
+void CallbackFunc(const DexRobot::DX21StatusRxData * statusRx)
 {
     auto fingerId = statusRx->deviceId;
-    //auto fingerName = DexHandModelHelper::FingerID_2FingerName((FingerID)fingerId);
 
-    printf("Current1=%d, Degree1=%f, Current2=%d, Degree2=%f\n",
+    printf("Finger %d: Current1=%d, Degree1=%f, Current2=%d, Degree2=%f\n", fingerId,
             statusRx->MotorCurrent(1),
             statusRx->JointDegree(1),
             statusRx->MotorCurrent(2),
@@ -55,7 +141,17 @@ char *CmdReadLine(void)
 
 int main(int argc, const char ** argv)
 {
-    auto hand = DexHand::createInstance(ProductType::DX021, AdapterType::ZLG_200U, 0, true);
+    signal(SIGINT, signalHandler);
+    signal(SIGABRT, signalHandler);
+
+    if(argc == 3)
+    {
+        gHostAddr = std::string(argv[1]);
+        gHostPort = (uint16_t)atoi(argv[2]);
+        InitSocket();
+    }
+
+    auto hand = DexHand::createInstance(ProductType::DX021, AdapterType::ZLG_200U, 0);
     if(nullptr == hand)
     {
         std::cout << "Device not available." << std::endl;
@@ -65,7 +161,7 @@ int main(int argc, const char ** argv)
     DH21StatusRxCallback callback = std::bind(CallbackFunc, std::placeholders::_1);
     hand->setStatusRxCallback(callback);
 
-    if(!hand->connect())
+    if(!hand->connect(true))
     {
         std::cout << "Connection failure." << std::endl;
         exit(-1);
@@ -75,12 +171,7 @@ int main(int argc, const char ** argv)
     hand->setHandId(AdapterChannel::CHN0, handId);
     hand->setRealtimeResponse(handId, 0x01, 50, true);
 
-    //while(true) {
-    //}
-
     bool exitflg = false;
-    /*
-    */
     do
     {
         printf("DexHand-021>: ");
