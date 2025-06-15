@@ -8,6 +8,37 @@
 using namespace DexRobot;
 using namespace DexRobot::Dex021;
 
+
+void CallbackFunc(const DX21StatusRxData * status)
+{
+    //printf("BoradTemp = %d\n", status->boardTemper);
+    printf("Position1 = %d, Speed1 = %d, Current1=%d, MT Temp1=%d\n"
+        , status->MotorHallValue(0)
+        , status->MotorVelocity(0)
+        , status->MotorCurrent(0)
+        , status->MotorTemperature(0));
+
+    printf("Position2 = %d, Speed2 = %d, Current2=%d, MT Temp2=%d\n"
+        , status->MotorHallValue(1)
+        , status->MotorVelocity(1)
+        , status->MotorCurrent(1)
+        , status->MotorTemperature(1));
+
+    printf("Position3 = %d, Speed3 = %d, Current3=%d, MT Temp3=%d\n"
+        , status->MotorHallValue(2)
+        , status->MotorVelocity(2)
+        , status->MotorCurrent(2)
+        , status->MotorTemperature(2));
+
+    printf("Position4 = %d, Speed4 = %d, Current4=%d, MT Temp4=%d\n"
+        , status->MotorHallValue(3)
+        , status->MotorVelocity(3)
+        , status->MotorCurrent(3)
+        , status->MotorTemperature(3));
+
+    printf("\n");
+}
+
 char *CmdReadLine(void)
 {
     int bufsize = RL_BUFSIZE;
@@ -43,7 +74,18 @@ char *CmdReadLine(void)
 
 int main(int argc, const char ** argv)
 {
-    auto hand = DexHand::createInstance(ProductType::DX021_S, AdapterType::ZLG_200U, 0);
+    bool bListen = false;
+    if(argc == 2)
+    {
+        if(0 == strncmp(argv[1], "-l", 2))
+            bListen = true;
+    }
+
+    auto hand = DexHand::createInstance(ProductType::DX021_S, AdapterType::LYS_MINI, 0);
+
+    DH21StatusRxCallback callback = std::bind(CallbackFunc, std::placeholders::_1);
+    hand->setStatusRxCallback(callback);
+
     if(!hand->connect(true))
     {
         std::cout << "Connection failure." << std::endl;
@@ -51,7 +93,9 @@ int main(int argc, const char ** argv)
     }
 
     uint8_t handId = 0x02;
+
     hand->setHandId(AdapterChannel::CHN0, handId);
+    hand->setRealtimeResponse(handId, 0x00, 50, bListen);
 
     bool exitflg = false;
     do
@@ -72,6 +116,7 @@ int main(int argc, const char ** argv)
                 || strcasecmp(line, "quit") == 0)
         {
             exitflg = true;
+            hand->setRealtimeResponse(handId, 0x00, 50, false);
         }
         else
         {
@@ -93,11 +138,11 @@ int main(int argc, const char ** argv)
             uint16_t degree   = strtoint(args[2].c_str(), nullptr, 10);
             uint16_t velocity = strtoint(args[3].c_str(), nullptr, 10);
 
-            //if(deviceId != handId)
-            //{
-            //    std::cout << "Device " << deviceId << " is not connected" << std::endl;
-            //    continue;
-            //}
+            if(deviceId != handId)
+            {
+                std::cout << "Device " << deviceId << " is not connected" << std::endl;
+                continue;
+            }
 
             hand->moveFinger(deviceId, fingerId, 0x0, degree, velocity, MotorControlMode::HALL_POSITION_CONTROL_MODE);
         }
