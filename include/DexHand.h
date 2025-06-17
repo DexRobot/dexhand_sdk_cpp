@@ -14,6 +14,13 @@
 
 namespace DexRobot
 {
+
+class ZLG_CANFD_MSG;
+class LYS_CANFD_MSG;
+
+template<typename TAdapterMsg>
+class DX21TransitMsg;
+
 class DX21StatusRxData;
 class ErrorMessageRx;
 class SysParameterRWRx;
@@ -132,8 +139,14 @@ public:
     /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
     /// @param enable Switch to represent realtime sampling ON or OFF.
     /// @return true for success, false for failure.
-    DEXHAND_API virtual bool setRealtimeResponse(uint8_t deviceId, uint8_t fingerId, uint16_t sampleRate, bool enable) =
-    0;
+    DEXHAND_API virtual bool setRealtimeResponse(uint8_t deviceId, uint8_t fingerId, uint16_t sampleRate, bool enable) = 0;
+
+    /// Set realtime status data sampling ON or OFF for all fingers of DexHand device of specified ID.
+    /// @param deviceId The ID number of your DexHand product, AKA hand ID.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API virtual bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) = 0;
 
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// movement, and given control mode.
@@ -177,6 +190,17 @@ public:
     /// @param handId ID of the given hand
     /// @return Channel number of the given hand
     DEXHAND_API [[nodiscard]] virtual AdapterChannel channelOfHand(uint8_t handId);
+
+    /// Send instruction to retrieve all Sys IDs of connected DexHand device from specified channel.
+    /// For DX021, Sys ID is equivalent of finger ID, thus each device shall response 6 feedbacks for
+    /// each finger. For DX021-S, Sys ID is equivalent of hand ID, only 1 feedback will be responsed.
+    /// NOTICE: This is a blocking function, which won't return untill it gets all feedbacks from the
+    /// DexHand device, nor it reaches default timeout of 30 milliseconds no matter it gets all fingers'
+    /// ID or not.
+    /// @param channel Target channel of the adapter.
+    /// @param sysIdList Output. An reference of vector to carry the responsed Sys IDs from connected
+    /// DexHand device. Size of this argument will be 6 for DX021, and only 1 for DX021-S
+    DEXHAND_API virtual void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList) = 0;
 
     /// Set whether listen to the status data feedback of DexHand product in realtime mode or not
     /// @param enable true for listen, false for stop listening.
@@ -223,10 +247,33 @@ public:
     /// parameters, please refer to the user manual and DexHand protocols specification.
     DEXHAND_API virtual void setParamRWCallback(const ParamRwMessageCallBack &callback) const = 0;
 
+    /// Clear firmware errors on specified finger of device connected on specified adapter, for example motor blocking
+    /// error causes protection. For elaboration of possible errors, please refer to our product user manual.
+    /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
+    /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
+    /// not execute any of your subsequent control instructions after you already called this function.
+    /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
+    /// @param fingerId ID number of target finger, which encounteres any error you want to clear.
+    DEXHAND_API virtual void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) = 0;
+
+    /// Reboot the specified device connected on specified channel.
+    /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
+    /// @param deviceId Target ID number of device you want to reboot. For DX021, this paramter represents finger ID. For
+    /// DX021-S it represents the hand ID.
+    DEXHAND_API virtual void rebootDevice(AdapterChannel channel, uint8_t deviceId) = 0;
+
+    /// Reset all finger joints back to initial state position.
+    /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
+    DEXHAND_API virtual void resetJoints(AdapterChannel channel) = 0;
+
 protected:
     DexHand(AdapterType, uint8_t adpaterIndex);
     [[nodiscard]] std::map<const AdapterChannel, uint8_t> & devices();
     [[nodiscard]] const std::map<const AdapterChannel, uint8_t> & devices() const;
+
+public:
+    friend class DexHand_021;
+    friend class DexHand_021S;
 
 protected:
     AdapterType adapterType;
@@ -255,8 +302,6 @@ public:
     /// adapter type includes ZLG USBCANFD-200U, USBCANFD-100U-mini, LYS USBCANFD-Mini.
     /// @param adapterType The specific type of your adapter.
     /// @param adpaterIndex The index identified by system USB port of your adapter, start from 0.
-    /// @param listen A flag to indicate whether you want your program to listen to response data of DexHand021 in
-    /// realtime mode or not.
     DEXHAND_API DexHand_021(AdapterType adapterType, uint8_t adpaterIndex);
 
     ~DexHand_021() override;
@@ -271,6 +316,38 @@ public:
     /// Disconnect from the communication adapter, while the DexHand021 device will be disconnected as well
     /// @return true for success, false for failure
     DEXHAND_API bool disconnect() override;
+
+    /// Send instruction to retrieve all finger IDs of connected DX021 device from specified channel. Function will
+    /// NOT return untill it gets all fingers' ID, nor it reaches default 30 milliseconds timeout, not matter it gets
+    /// all fingers' ID or not.
+    /// @param channel Target channel of the adapter.
+    /// @param sysIdList Output. An reference of vector to carry the responsed finger IDs from connected DX021 device.
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList) override;
+
+    /// Send instruction to retrieve all finger IDs of connected DX021 device from specified channel.
+    /// @param channel Target channel of the adapter.
+    /// @param sysIdList Output. An reference of vector to carry the responsed finger IDs from connected DX021 device.
+    /// @param timeout number of milliseconds of timeout, this function will return anyway, even it does NOT receive
+    /// all feedbacks of ID from each finger.
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList, uint32_t timeout=30);
+
+    /// Clear firmware errors on specified finger on DX021 device of specified CANFD adapter channel. For elaboration
+    /// of possible errors, please refer to our product user manual.
+    /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
+    /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
+    /// not execute any of your subsequent control instructions after you already called this function.
+    /// @param channel Channel number on which the connected DexHand device you want to clear the errors.
+    /// @param fingerId ID number of target finger, which encounteres any error you want to clear.
+    DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) override;
+
+    /// Reboot the specified device connected on specified channel.
+    /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
+    /// @param deviceId Target ID number of device you want to reboot. For DX021, this paramter represents finger ID.
+    DEXHAND_API void rebootDevice(AdapterChannel channel, uint8_t deviceId) override;
+
+    /// Reset all finger joints back to initial state position.
+    /// @param channel Target channel of the adapter, on wich the DX021 device is connected.
+    DEXHAND_API void resetJoints(AdapterChannel channel) override;
 
     /// Register a callback function for processing the status feedback data of your DexHand021 device.
     /// @param callback Callback function to be registered.
@@ -326,6 +403,13 @@ public:
     /// @param enable Switch to represent realtime sampling ON or OFF.
     /// @return true for success, false for failure.
     DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint8_t fingerId, uint16_t sampleRate, bool enable) override;
+
+    /// Set realtime status data sampling ON or OFF for all fingers of DexHand device of specified ID.
+    /// @param deviceId The ID number of your DX021 device, AKA hand ID.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
 
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// expected motion, via given control mode.
@@ -412,6 +496,40 @@ public:
     /// @return ID of hand of the corresponding channel.
     DEXHAND_API [[nodiscard]] uint8_t handID(AdapterChannel channel) override;
 
+    /// Send instruction to retrieve SysID, AKA hand ID of connected DX021-S device from specified channel. This is
+    /// an equivalent call of handID(channel).
+    /// @param channel Target channel of the adapter.
+    /// @param sysIdList Output. An reference of vector to carry the hand ID from connected DX021-S device.
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList) override;
+
+    /// Send instruction to retrieve SysID, AKA hand ID of connected DX021-S device from specified channel. This is
+    /// an equivalent call of handID(channel), excepting users can specify the timeout of their own.
+    /// @param channel Target channel of the adapter.
+    /// @param sysIdList Output. An reference of vector to carry the hand ID from connected DX021-S device.
+    /// @param timeout number of milliseconds of timeout, this function willl return anyway, even it does NOT receive
+    /// the hand ID from connected device.
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList, uint32_t timeout=30);
+
+    /// Clear firmware errors on specified DX021-S finger of specified CANFD adapter channel. For elaboration
+    /// of possible errors, please refer to our product user manual.
+    /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
+    /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
+    /// not execute any of your subsequent control instructions after you already called this function.
+    /// @param channel Channel number on which the connected DexHand device you want to clear the errors.
+    /// @param fingerId ID number of target device, which encounteres any error you want to clear.
+    DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) override;
+
+    /// Reboot the specified device connected on specified channel.
+    /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
+    /// @param deviceId Target ID number of device you want to reboot. For DX021-S this paramter represents the hand ID.
+    /// However, DX021-S pocesses only one single control board, this parameter is ignored here, and the device connected
+    /// on specified adapater channel will be reboot anyway, no matter what the hand ID number is.
+    DEXHAND_API void rebootDevice(AdapterChannel channel, uint8_t deviceId) override;
+
+    /// Reset all finger joints back to initial state position.
+    /// @param channel Target channel of the adapter, on wich the DX021-S device is connected.
+    DEXHAND_API void resetJoints(AdapterChannel channel) override;
+
     /// Register a callback function for processing the status feedback data of your DexHand_021S device.
     /// @param callback Callback function to be registered.
     DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallback &callback) const override;
@@ -463,6 +581,13 @@ public:
     /// @param enable Switch to represent realtime sampling ON or OFF.
     /// @return true for success, false for failure.
     DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint8_t fingerId, uint16_t sampleRate, bool enable) override;
+
+    /// Set realtime status data sampling ON or OFF for all fingers of DexHand device of specified ID.
+    /// @param deviceId The ID number of your DX021-S device, AKA hand ID.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
 
     /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
     /// values of expected motion, via given control mode.
@@ -518,5 +643,6 @@ private:
     void * hermes;
 };
 */
+
 }
 }

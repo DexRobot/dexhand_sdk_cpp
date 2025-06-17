@@ -72,16 +72,49 @@ char *CmdReadLine(void)
     }
 }
 
+void show_usage()
+{
+    std::cout << "USAGE: dexhand021s <-zlg2u | -zlgm | -lys> [-l]" << std::endl;
+    std::cout << "\t-zlg2u, use ZLG USB CANFD 200U adapter" << std::endl;
+    std::cout << "\t-zlgm, use ZLG USB CANFD mini adapter" << std::endl;
+    std::cout << "\t-lys, use LYS USB CANFD mini adapter" << std::endl;
+    std::cout << "\t-l, optional, use for whether listening to realtime response or not" << std::endl;
+}
+
+
 int main(int argc, const char ** argv)
 {
     bool bListen = false;
-    if(argc == 2)
+    AdapterType atype;
+
+    if(argc != 3 && argc != 2)
     {
-        if(0 == strncmp(argv[1], "-l", 2))
-            bListen = true;
+        show_usage();
+        exit(1);
     }
 
-    auto hand = DexHand::createInstance(ProductType::DX021_S, AdapterType::LYS_MINI, 0);
+    if(0 == strncmp(argv[1], "-zlg2u", 6))
+    {
+        atype = AdapterType::ZLG_200U;
+    }
+    else if(0 == strncmp(argv[1], "-zlgm", 6))
+    {
+        atype = AdapterType::ZLG_MINI;
+    }
+    else if(0 != strncmp(argv[1], "-lys", 4))
+    {
+        atype = AdapterType::LYS_MINI;
+    }
+    else
+    {
+        show_usage();
+        exit(1);
+    }
+
+    if(0 == strncmp(argv[2], "-l", 2))
+        bListen = true;
+
+    auto hand = DexHand::createInstance(ProductType::DX021_S, atype, 0);
 
     DH21StatusRxCallback callback = std::bind(CallbackFunc, std::placeholders::_1);
     hand->setStatusRxCallback(callback);

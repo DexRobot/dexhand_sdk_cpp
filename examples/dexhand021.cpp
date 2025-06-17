@@ -15,15 +15,7 @@
 using namespace DexRobot;
 using namespace DexRobot::Dex021;
 
-/// global variables for socket connections
-int gConnSockFd = -1;
-std::string gHostAddr;
-uint16_t gHostPort;
-bool gSrvrConnected = false;
-
-void InitSocket();
-void SendToSocket(const char * frame, size_t frameSize, size_t frameCnt=1);
-
+DexHand::PTR gHandInstance = nullptr;
 
 void signalHandler(int signum)
 {
@@ -31,69 +23,19 @@ void signalHandler(int signum)
 
     if (signum == SIGINT) {
         std::cout << "Closing socket..." << std::endl;
-        if(gConnSockFd != -1)
-            shutdown(gConnSockFd, SHUT_WR);
+        if(gHandInstance != nullptr)
+            gHandInstance->disconnect();
         
         exit(0);
     }
     else if (signum == SIGABRT) {
         std::cout << "Closing socket..." << std::endl;
-        if(gConnSockFd != -1)
-            shutdown(gConnSockFd, SHUT_WR);
+        if(gHandInstance != nullptr)
+            gHandInstance->disconnect();
         
         exit(signum);
     }
 }
-
-
-void InitSocket()
-{
-    gConnSockFd = socket(AF_INET, SOCK_STREAM, 0);
-    if(gConnSockFd == -1)
-    {
-        fprintf(stderr, "Create socket descriptor failed. Data will not be sent\n");
-        return;
-    }
-
-    struct sockaddr_in srvr_addr;
-    memset((char *)&srvr_addr, 0, sizeof(struct sockaddr_in));
-
-    srvr_addr.sin_family = AF_INET;
-    srvr_addr.sin_addr.s_addr = inet_addr(gHostAddr.c_str());
-    srvr_addr.sin_port = htons(gHostPort);
-
-    gSrvrConnected = (0 == ::connect(gConnSockFd, (const struct sockaddr *)&srvr_addr, sizeof(srvr_addr)));
-    if(gSrvrConnected)
-    {
-        fprintf(stderr, "Socket connection is not able to be established, data will not be sent\n");
-    }
-}
-
-
-void SendToSocket(const char * frame, size_t frameSize)
-{
-    if(!gSrvrConnected || gConnSockFd == -1)
-    {
-        std::cout << "Socket not available, skip sending data" << std::endl;
-        return;
-    }
-
-    size_t buffLen = frameSize;
-
-    ssize_t sentLen = send(gConnSockFd, frame, buffLen, 0);
-    if(sentLen < 0)
-    {
-        shutdown(gConnSockFd, SHUT_WR);
-        gConnSockFd = -1;
-        gSrvrConnected = false;
-
-        if(sentLen == -1)
-        {
-            fprintf(stderr, "Connection closed by peer\n");
-        }
-    }
-}
-
 
 void CallbackFunc(const DexRobot::DX21StatusRxData * statusRx)
 {
@@ -144,37 +86,38 @@ int main(int argc, const char ** argv)
     signal(SIGINT, signalHandler);
     signal(SIGABRT, signalHandler);
 
-    if(argc == 3)
-    {
-        gHostAddr = std::string(argv[1]);
-        gHostPort = (uint16_t)atoi(argv[2]);
-        InitSocket();
-    }
-
-    auto hand = DexHand::createInstance(ProductType::DX021, AdapterType::ZLG_200U, 0);
-    if(nullptr == hand)
+    /// Create an instance of DX021 device, on channel 0 of ZLG USBCANFD-200U adapter
+    gHandInstance = DexHand::createInstance(ProductType::DX021, AdapterType::ZLG_200U, 0);
+    if(nullptr == gHandInstance)
     {
         std::cout << "Device not available." << std::endl;
         exit(-1);
     }
 
+    /// Register a callback function to process the realtime data of DexHand-021 status feedbacks. In this example,
+    /// the callback function simply just print the data on standard output (screen).
     DH21StatusRxCallback callback = std::bind(CallbackFunc, std::placeholders::_1);
-    hand->setStatusRxCallback(callback);
+    //gHandInstance->setStatusRxCallback(callback);
 
-    if(!hand->connect(true))
+    if(!gHandInstance->connect(true))
     {
         std::cout << "Connection failure." << std::endl;
         exit(-1);
     }
 
     uint8_t handId = 0x01;
-    hand->setHandId(AdapterChannel::CHN0, handId);
-    hand->setRealtimeResponse(handId, 0x01, 50, true);
+
+    /// This is not a "must", by default, the left hand is assigned as ID 1, while right hand is assigned as ID 2
+    /// To be certain if you want to change the default ID of hand, then you can call this.
+    gHandInstance->setHandId(AdapterChannel::CHN0, handId);
+
+    // Set realtime response for all fingers
+    gHandInstance->setRealtimeResponse(handId, 50, true);
 
     bool exitflg = false;
     do
     {
-        printf("DexHand-021>: ");
+        printf("DexHand-021 move finger>: ");
         char * line = CmdReadLine();
 
         if(strlen(line) == 0)
@@ -193,31 +136,30 @@ int main(int argc, const char ** argv)
         }
         else
         {
-            if(args.size() != 5)
+            if(args.size() != 4)
             {
                 free(line);
                 std::cout << "[ERROR]: Incomplete execution arguments" << std::endl;
-                std::cout << "USAGE: <device_id> <finger_id> <joint_position> <value 1> <value 2>" << std::endl;
+                std::cout << "USAGE: <device_id> <finger_id> <joint_id> <value 1> <value 2>" << std::endl;
                 std::cout << "ARGUMENTS:" << std::endl;
-                std::cout << "  device_id:\tFor DX021, AKA hand ID, either be 1(for left hand) or 2(for right hand)" << std::endl;
                 std::cout << "  finger_id:\tFor DX021, it's between [1, 12]" << std::endl;
-                std::cout << "  joint_position:\tFor DX021, it stands for the distal or proximal joint of the finger, value from enmu JointMotor" << std::endl;
+                std::cout << "  joint_id:\tFor DX021, it stands for the distal or proximal joint of the finger, value from enum JointMotor" << std::endl;
                 std::cout << "  value 1:\tFor DX021, it's the target value of distal joint degree*100" << std::endl;
                 std::cout << "  value 2:\tFor DX021, it's the target value of proximal joint degree*100" << std::endl;
                 continue;
             }
 
-            uint8_t  deviceId = strtoint(args[0].c_str(), nullptr, 10);
-            uint8_t  fingerId = strtoint(args[1].c_str(), nullptr, 10);
-            uint8_t  jointPos = strtoint(args[2].c_str(), nullptr, 10);
-            uint16_t value1   = strtoint(args[3].c_str(), nullptr, 10);
-            uint16_t value2   = strtoint(args[4].c_str(), nullptr, 10);
+            uint8_t  fingerId = strtoint(args[0].c_str(), nullptr, 10);
+            uint8_t  jointId = strtoint(args[1].c_str(), nullptr, 10);
+            uint16_t value1   = strtoint(args[2].c_str(), nullptr, 10);
+            uint16_t value2   = strtoint(args[3].c_str(), nullptr, 10);
 
-            hand->moveFinger(deviceId, fingerId, jointPos, value1, value2, MotorControlMode::CASCADED_PID_CONTROL_MODE);
+            gHandInstance->moveFinger(handId, fingerId, jointId, value1, value2, MotorControlMode::CASCADED_PID_CONTROL_MODE);
         }
 
         free(line);
     } while(exitflg != true);
 
+    gHandInstance->disconnect();
     return 0;
 }
