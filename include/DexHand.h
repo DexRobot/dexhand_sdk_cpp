@@ -148,6 +148,12 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API virtual bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) = 0;
 
+    /// Set realtime status data sampling ON or OFF for all fingers of all DexHand devices on this adapter.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API virtual bool setRealtimeResponse(uint16_t sampleRate, bool enable) = 0;
+
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// movement, and given control mode.
     /// @param deviceId The ID number of your DexHand product, AKA hand ID.
@@ -411,6 +417,12 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
 
+    /// Set realtime status data sampling ON or OFF for all fingers of all DexHand devices on this adapter.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setRealtimeResponse(uint16_t sampleRate, bool enable) override;
+
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// expected motion, via given control mode.
     /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
@@ -588,6 +600,12 @@ public:
     /// @param enable Switch to represent realtime sampling ON or OFF.
     /// @return true for success, false for failure.
     DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
+
+    /// Set realtime status data sampling ON or OFF for all fingers of all DexHand devices on this adapter.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setRealtimeResponse(uint16_t sampleRate, bool enable) override;
 
     /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
     /// values of expected motion, via given control mode.
