@@ -148,8 +148,35 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API virtual bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) = 0;
 
+    /// Set realtime status data sampling ON or OFF for all fingers of all DexHand devices on this adapter.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API virtual bool setRealtimeResponse(uint16_t sampleRate, bool enable) = 0;
+
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// movement, and given control mode.
+    /// @param deviceId The ID number of your DexHand product, AKA hand ID.
+    /// @param fingerId The ID number of the indicated finger on your DexHand product.
+    /// @param jointPosition Position ID of a specific joint, if this joint is a driving joint.
+    /// @param controlArg1 Target value 1 of initiated action. In different DexHand products, and under different
+    /// control mode, it represents differenet semantic meanings. For DexHand021, it represents the target action
+    /// value of distal joint of finger. However for 021-S, it represents the target value of MCP of finger, cause
+    /// 021-S has only one driving joint of each finger, and it is MCP. And for CASCADED_PID_CONTROL_MODE, it's
+    /// the value of target degree*100, but for HALL_POSITION_CONTROL_MODE, it's target value of hall position to
+    /// drive the motor.
+    /// @param controlArg2 Target value 2 of initiated action. For DexHand021, it represents target action value
+    /// of proximal joint(actually MCP). For DexHand_021S, it is the driving velocity of motor, representing the
+    /// value of degrees*100 per second. Refer to comments of controlArg1 for other information.
+    /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode.
+    /// @param delay Number of milliseconds for delaying execution of this instruction, if user does not want it to
+    /// be executed immediately.
+    /// @return true if the instruction is sent successfully, false if it is not.
+    DEXHAND_API virtual bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
+        int16_t controlArg1, int16_t controlArg2, MotorControlMode mode, int32_t delay) = 0;
+
+    /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
+    /// movement, and given control mode. The instruction will be executed immediately once the device accepts it.
     /// @param deviceId The ID number of your DexHand product, AKA hand ID.
     /// @param fingerId The ID number of the indicated finger on your DexHand product.
     /// @param jointPosition Position ID of a specific joint, if this joint is a driving joint.
@@ -411,6 +438,29 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
 
+    /// Set realtime status data sampling ON or OFF for all fingers of all DexHand devices on this adapter.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setRealtimeResponse(uint16_t sampleRate, bool enable) override;
+
+    /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
+    /// expected motion, via given control mode.
+    /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger on your DexHand021 device.
+    /// @param jointPosition Position ID of a specific joint, acceptable values are evaluated by enum class JointMotor.
+    /// e.g. 0x01 for distal joint, 0x02 for proximal joint, and 0x03 for both.
+    /// @param distValue Value of motion for distal joint to move. For CASCADED_PID_CONTROL_MODE mode, it's the value of
+    /// target degree*100. For HALL_POSITION_CONTROL_MODE, it's incremental value of hall position to drive the motor,
+    /// based on its current position.
+    /// @param proxValue Value of motion for proximal joint to move.
+    /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode.
+    /// @param delay Number of milliseconds for delaying execution of this instruction, if user does not want it to
+    /// be executed immediately.
+    /// @return true if the instruction is sent successfully, false if it is not.
+    DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
+        int16_t distValue, int16_t proxValue, MotorControlMode mode, int32_t delay) override;
+
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// expected motion, via given control mode.
     /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
@@ -425,7 +475,6 @@ public:
     /// @return true if the instruction is sent successfully, false if it is not.
     DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition
       , int16_t distValue, int16_t proxValue, DexRobot::MotorControlMode mode) override;
-
 
     /// Send an action control instruction to specified finger and joint of a specified hand, with given values of
     /// expected motion, via deteremined CASCADED_PID_CONTROL_MODE.
@@ -589,6 +638,26 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
 
+    /// Set realtime status data sampling ON or OFF for all fingers of all DexHand devices on this adapter.
+    /// @param sampleRate Rate(in Hz) of sampling on finger's status data. 1000 in minimum and 3 in maximum
+    /// @param enable Switch to represent realtime sampling ON or OFF.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setRealtimeResponse(uint16_t sampleRate, bool enable) override;
+
+    /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
+    /// values of expected motion, via given control mode.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger on your 021S device.
+    /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
+    /// @param motionValue Motion value for finger to move. Accepted value is target degree*100.
+    /// @param velocity Velocity for the steering motor to move. Accepted value is degree*100 per second.
+    /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode.
+    /// @param delay Number of milliseconds for delaying execution of this instruction, if user does not want it to
+    /// be executed immediately.
+    /// @return true if the instruction is sent successfully, false if it is not.
+    DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition
+      , int16_t motionValue, int16_t velocity, MotorControlMode mode, int32_t delay) override;
+
     /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
     /// values of expected motion, via given control mode.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
@@ -599,7 +668,7 @@ public:
     /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode.
     /// @return true if the instruction is sent successfully, false if it is not.
     DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition
-      , int16_t motionValue, int16_t velocity, DexRobot::MotorControlMode mode) override;
+      , int16_t motionValue, int16_t velocity, MotorControlMode mode) override;
 
     /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
     /// values of expected motion, via deteremined HALL_POSITION_CONTROL_MODE.
