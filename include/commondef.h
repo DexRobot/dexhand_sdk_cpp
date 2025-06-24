@@ -165,34 +165,4 @@ enum class JointID : uint8_t
     LF_MCP,
 };
 
-class DX21StatusRxData
-{
-public:
-    DX21StatusRxData() = delete;
-    virtual ~DX21StatusRxData() = default;
-
-    DEXHAND_API virtual void update(const unsigned char *) = 0;
-    [[nodiscard]] DEXHAND_API virtual const char * data() const = 0;
-    [[nodiscard]] DEXHAND_API virtual int16_t hallValue(uint8_t motorId) const = 0;
-
-    [[nodiscard]] DEXHAND_API virtual int16_t MotorCurrent(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual int16_t MotorVelocity(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual int16_t MotorHallValue(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual int16_t MotorTemperature(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual int32_t ApprochingValue(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual   float JointDegree(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual   float NormalForce(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual   float TangentForce(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual int32_t NormalForceDelta(uint8_t subDeviceId) const = 0;
-    [[nodiscard]] DEXHAND_API virtual int32_t TangentForceDelta(uint8_t subDeviceId) const = 0;
-
-protected:
-    DX21StatusRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp);
-
-public:
-    uint8_t deviceId;
-    uint8_t channelId;
-    int64_t timestamp;
-};
-
 }

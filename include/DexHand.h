@@ -21,28 +21,32 @@ class LYS_CANFD_MSG;
 template<typename TAdapterMsg>
 class DX21TransitMsg;
 
-class DX21StatusRxData;
-class ErrorMessageRx;
-class SysParameterRWRx;
+struct ErrorMessageRx;
+struct SysParameterRWRx;
 
 namespace Dex021
 {
-enum class ProductType
+
+class DexHand_021;
+class DexHand_021S;
+
+enum class ProductType : int
 {
+    UNSUPPORTED = -1,
     DX021,
     DX021_S,
     DX021_PRO,
 };
 
-enum class AdapterType
+enum class AdapterType : int
 {
-    ZLG_200U,
-    ZLG_MINI,
-    LYS_MINI,
+    ZLG_200U = 33,
+    ZLG_MINI = 42,
+    LYS_MINI = 43,
     USB2_485,
 };
 
-enum class AdapterChannel
+enum class AdapterChannel : int
 {
     CHNX = -1,
     CHN0 = 0,
@@ -51,7 +55,7 @@ enum class AdapterChannel
     CHN3,
 };
 
-struct DXInstruction
+struct DX21Instruction
 {
     uint8_t channel;
     uint8_t deviceId;
@@ -62,9 +66,75 @@ struct DXInstruction
     MotorControlMode mode;
 };
 
+class DX21StatusRxData
+{
+public:
+    DX21StatusRxData() = delete;
+    virtual ~DX21StatusRxData() = default;
+
+    static DX21StatusRxData * load(ProductType pdType, uint8_t channelId, uint8_t deviceId, const unsigned char * payload);
+
+    DEXHAND_API virtual void update(const unsigned char *) = 0;
+    [[nodiscard]] DEXHAND_API virtual const char * data() const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t hallValue(uint8_t motorId) const = 0;
+
+    [[nodiscard]] DEXHAND_API virtual int16_t MotorCurrent(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t MotorVelocity(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t MotorHallValue(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t MotorTemperature(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int32_t ApprochingValue(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual   float JointDegree(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual   float NormalForce(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual   float TangentForce(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int32_t NormalForceDelta(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int32_t TangentForceDelta(uint8_t subDeviceId) const = 0;
+
+protected:
+    DX21StatusRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp);
+
+public:
+    uint8_t deviceId;
+    uint8_t channelId;
+    int64_t timestamp;
+};
+
+typedef std::function<void (const Dex021::DX21StatusRxData *)> DH21StatusRxCallBack;
 typedef std::function<void (const DexRobot::ErrorMessageRx *)> ErrorMessageCallBack;
-typedef std::function<void (const DexRobot::DX21StatusRxData *)> DH21StatusRxCallback;
 typedef std::function<void (const DexRobot::SysParameterRWRx *)> ParamRwMessageCallBack;
+
+
+template<typename TInstance>
+class PredefinedGestures final
+{
+public:
+    static_assert((std::is_same_v<Dex021::DexHand_021, TInstance> || std::is_same_v<Dex021::DexHand_021S, TInstance>),
+        "Given template argument must be type of Dex021::DexHand_021 or Dex021::DexHand_021S");
+
+    explicit PredefinedGestures(TInstance * instance);
+    ~PredefinedGestures() = default;
+
+public:
+    DEXHAND_API void HandRelax(uint8_t deviceId);
+    DEXHAND_API void Fist(uint8_t deviceId);
+    DEXHAND_API void Victory(uint8_t deviceId);
+    DEXHAND_API void ThumbUp(uint8_t deviceId);
+    DEXHAND_API void Rock(uint8_t deviceId);
+    DEXHAND_API void NoProblem(uint8_t deviceId);
+    DEXHAND_API void One(uint8_t deviceId);
+    DEXHAND_API void Two(uint8_t deviceId);
+    DEXHAND_API void Three(uint8_t deviceId);
+    DEXHAND_API void Four(uint8_t deviceId);
+    DEXHAND_API void Five(uint8_t deviceId);
+    DEXHAND_API void Six(uint8_t deviceId);
+    DEXHAND_API void Seven(uint8_t deviceId);
+    DEXHAND_API void Eight(uint8_t deviceId);
+    DEXHAND_API void Nine(uint8_t deviceId);
+    DEXHAND_API void Ten(uint8_t deviceId);
+
+private:
+    TInstance * dxInstance;
+};
+
 
 class DexHand
 {
@@ -83,6 +153,10 @@ public:
     /// @param adpaterIndex The index identified by system USB port of your adapter, start from 0.
     DEXHAND_API static PTR createInstance(ProductType productType, AdapterType adapterType, uint8_t adpaterIndex);
 
+    DEXHAND_API [[nodiscard]] uint8_t numberOfDevices() const;
+
+    DEXHAND_API [[nodiscard]] std::vector<AdapterChannel> channels() const;
+
     /// Establish connection between your program and the communication adapter your DexHand product is plugged in.
     /// @return true for success, false for failure
     /// @param listen A flag to indicate whether you want your program to listen to status data feedback of DexHand
@@ -93,6 +167,12 @@ public:
     /// Disconnect from the communication adapter.
     /// @return true for success, false for failure
     DEXHAND_API virtual bool disconnect() = 0;
+
+    /// Get the version of firmware of specified hand or finger.
+    /// @param deviceId Device ID, AKA hand ID.
+    /// @param fingerId Finger ID. For DX021-S, this is ignored.
+    /// @return The version number of firmware.
+    DEXHAND_API virtual uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) = 0;
 
     /// Set the safe value of electric current of an indicated motor drive in your DexHand product. The DexHand firmware
     /// will drive the motor in particular patterns under different control modes to protect the motor and mechanic units
@@ -259,7 +339,7 @@ public:
     /// @param callback Callback function to be registered, which is declared as form of DH21StatusRxCallback, AKA
     /// std::function<void (DexRobot::DX21StatusRxData *)>. In your callback function, you don't need to free the
     /// pointer of DX21StatusRxData object.
-    DEXHAND_API virtual void setStatusRxCallback(const DH21StatusRxCallback &callback) const = 0;
+    DEXHAND_API virtual void setStatusRxCallback(const DH21StatusRxCallBack &callback) const = 0;
 
     /// Set a callback function for processing the error messages responsed by DexHand.
     /// @param callback Error processing callback function to be registered, which must be declared as form of
@@ -301,6 +381,8 @@ protected:
 public:
     friend class DexHand_021;
     friend class DexHand_021S;
+    friend class PredefinedGestures<DexHand_021>;
+    friend class PredefinedGestures<DexHand_021S>;
 
 protected:
     AdapterType adapterType;
@@ -316,8 +398,7 @@ private:
     std::map<const AdapterChannel, uint8_t> handIds;
 };
 
-
-class DexHand_021 final : public DexHand
+class DexHand_021 : public DexHand
 {
 public:
     using PTR = std::shared_ptr<DexHand_021>;
@@ -358,6 +439,12 @@ public:
     /// all feedbacks of ID from each finger.
     DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList, uint32_t timeout=30);
 
+    /// Get the version of firmware of specified finger of specified DX021 hand device.
+    /// @param deviceId Device ID, AKA hand ID.
+    /// @param fingerId Finger ID.
+    /// @return The version number of firmware.
+    DEXHAND_API uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) override;
+
     /// Clear firmware errors on specified finger on DX021 device of specified CANFD adapter channel. For elaboration
     /// of possible errors, please refer to our product user manual.
     /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
@@ -378,7 +465,7 @@ public:
 
     /// Register a callback function for processing the status feedback data of your DexHand021 device.
     /// @param callback Callback function to be registered.
-    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallback &callback) const override;
+    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallBack &callback) const override;
 
     /// Register a callback function for processing the error messages responsed by your DexHand021 device.
     /// @param callback Callback function to be registered.
@@ -496,7 +583,7 @@ private:
 };
 
 
-class DexHand_021S final : public DexHand
+class DexHand_021S : public DexHand
 {
 public:
     using PTR = std::shared_ptr<DexHand_021S>;
@@ -559,14 +646,20 @@ public:
     /// the hand ID from connected device.
     DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList, uint32_t timeout=30);
 
+    /// Get the version of firmware of specified DX021-S hand device.
+    /// @param deviceId Device ID, AKA hand ID.
+    /// @param fingerId Finger ID. This is ignored for DX021-S poceesses only one control board shared by all fingers.
+    /// @return The version number of firmware.
+    DEXHAND_API uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) override;
+
     /// Clear firmware errors on specified DX021-S finger of specified CANFD adapter channel. For elaboration
     /// of possible errors, please refer to our product user manual.
     /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
     /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
     /// not execute any of your subsequent control instructions after you already called this function.
     /// @param channel Channel number on which the connected DexHand device you want to clear the errors.
-    /// @param fingerId ID number of target device, which encounteres any error you want to clear.
-    DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) override;
+    /// @param deviceId ID number of target device, which encounteres any error you want to clear.
+    DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t deviceId) override;
 
     /// Reboot the specified device connected on specified channel.
     /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
@@ -581,7 +674,7 @@ public:
 
     /// Register a callback function for processing the status feedback data of your DexHand_021S device.
     /// @param callback Callback function to be registered.
-    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallback &callback) const override;
+    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallBack &callback) const override;
 
     /// Register a callback function for processing the error messages responsed by your DexHand_021S device.
     /// @param callback Callback function to be registered.
