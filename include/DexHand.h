@@ -383,6 +383,8 @@ public:
     friend class DexHand_021S;
     friend class PredefinedGestures<DexHand_021>;
     friend class PredefinedGestures<DexHand_021S>;
+    // friend class DexHandAdmin<DexHand_021>;
+    // friend class DexHandAdmin<DexHand_021S>;
 
 protected:
     AdapterType adapterType;
