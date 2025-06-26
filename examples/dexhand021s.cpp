@@ -111,12 +111,12 @@ int main(int argc, const char ** argv)
         exit(1);
     }
 
-    if(0 == strncmp(argv[2], "-l", 2))
+    if(argc == 3 && (0 == strncmp(argv[2], "-l", 2)))
         bListen = true;
 
     auto hand = DexHand::createInstance(ProductType::DX021_S, atype, 0);
 
-    DH21StatusRxCallback callback = std::bind(CallbackFunc, std::placeholders::_1);
+    DH21StatusRxCallBack callback = std::bind(CallbackFunc, std::placeholders::_1);
     hand->setStatusRxCallback(callback);
 
     if(!hand->connect(true))

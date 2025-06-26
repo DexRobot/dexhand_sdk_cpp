@@ -37,7 +37,7 @@ void signalHandler(int signum)
     }
 }
 
-void CallbackFunc(const DexRobot::DX21StatusRxData * statusRx)
+void CallbackFunc(const Dex021::DX21StatusRxData * statusRx)
 {
     auto fingerId = statusRx->deviceId;
 
@@ -96,7 +96,7 @@ int main(int argc, const char ** argv)
 
     /// Register a callback function to process the realtime data of DexHand-021 status feedbacks. In this example,
     /// the callback function simply just print the data on standard output (screen).
-    DH21StatusRxCallback callback = std::bind(CallbackFunc, std::placeholders::_1);
+    DH21StatusRxCallBack callback = std::bind(CallbackFunc, std::placeholders::_1);
     //gHandInstance->setStatusRxCallback(callback);
 
     if(!gHandInstance->connect(true))
