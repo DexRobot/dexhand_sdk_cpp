@@ -283,6 +283,16 @@ public:
     /// @return An enum value represents product type, refer to definitions of ProductType for possible values.
     DEXHAND_API [[nodiscard]] virtual ProductType productType() const = 0;
 
+    /// Confirm if the control board of given device ID is connected/alive on the specified channel. This is for
+    /// diagnostice purpose, or for confirming the device ID if user is not certain of the ID number of device,
+    /// This function blocks for 100 milliseconds then return, no matter the expected device responses or not,
+    /// if the device does not anser, it returns false.
+    /// @param channel Target channel of the adapter.
+    /// @param deviceId ID number of the control board. For DX021, the deviceId represents the ID of a finger,
+    /// for DX021-S, it represents the ID number of hand.
+    /// @return True if the expected device is alive, false if it is not.
+    DEXHAND_API [[nodiscard]] virtual bool isAlive(AdapterChannel channel, uint8_t deviceId) = 0;
+
     /// Set ID for the hand is connecting to the given channel of adapater.
     /// @param channel Target channel of the adapter.
     /// @param handId Given ID will be assigned to the connecting hand
@@ -426,6 +436,12 @@ public:
     /// Disconnect from the communication adapter, while the DexHand021 device will be disconnected as well
     /// @return true for success, false for failure
     DEXHAND_API bool disconnect() override;
+
+    /// Confirm if the finger of given ID is connected/alive on the hand of specified adapter channel
+    /// @param channel Target channel of the adapter.
+    /// @param fingerId ID number of hand.
+    /// @return True if the expected hand is connected and alive, false if it is not.
+    DEXHAND_API [[nodiscard]] bool isAlive(AdapterChannel channel, uint8_t fingerId) override;
 
     /// Send instruction to retrieve all finger IDs of connected DX021 device from specified channel. Function will
     /// NOT return untill it gets all fingers' ID, nor it reaches default 30 milliseconds timeout, not matter it gets
@@ -627,6 +643,12 @@ public:
     /// write process timed out. Please call errorCode() after this function returns, to make sure the given device
     /// ID is successfully written.
     DEXHAND_API void setHandId(AdapterChannel channel, uint8_t handId) override;
+
+    /// Confirm if the hand of given deviceID is connected/alive on specified adapter channel
+    /// @param channel Target channel of the adapter.
+    /// @param deviceId ID number of hand.
+    /// @return True if the expected hand is connected and alive, false if it is not.
+    DEXHAND_API [[nodiscard]] bool isAlive(AdapterChannel channel, uint8_t deviceId) override;
 
     /// A blocking method to get the assigned ID number of the hand is connected to specified channel of adapter.
     /// The method won't return until the device firmware sends feedback of its own ID.
