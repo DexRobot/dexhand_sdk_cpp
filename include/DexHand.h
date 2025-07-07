@@ -16,10 +16,7 @@ namespace DexRobot
 {
 
 class ZLG_CANFD_MSG;
-class LYS_CANFD_MSG;
-
-template<typename TAdapterMsg>
-class DX21TransitMsg;
+//class LYS_CANFD_MSG;
 
 struct ErrorMessageRx;
 struct SysParameterRWRx;
