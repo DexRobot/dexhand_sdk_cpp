@@ -72,7 +72,7 @@ public:
     static DX21StatusRxData * load(ProductType pdType, uint8_t channelId, uint8_t deviceId, const unsigned char * payload);
 
     DEXHAND_API virtual void update(const unsigned char *) = 0;
-    [[nodiscard]] DEXHAND_API virtual const char * data() const = 0;
+    [[nodiscard]] DEXHAND_API virtual const unsigned char * data() const = 0;
     [[nodiscard]] DEXHAND_API virtual int16_t hallValue(uint8_t motorId) const = 0;
 
     [[nodiscard]] DEXHAND_API virtual int16_t MotorCurrent(uint8_t subDeviceId) const = 0;
@@ -80,18 +80,24 @@ public:
     [[nodiscard]] DEXHAND_API virtual int16_t MotorHallValue(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual int16_t MotorTemperature(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual int32_t ApprochingValue(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t JointDegADC(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual   float JointDegree(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual   float NormalForce(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual   float TangentForce(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual int32_t NormalForceDelta(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual int32_t TangentForceDelta(uint8_t subDeviceId) const = 0;
 
+    [[nodiscard]] DEXHAND_API virtual float   Voltage() const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t PWMValue() const = 0;
+    [[nodiscard]] DEXHAND_API virtual int32_t ChipsetTemperature() const = 0;
+
 protected:
-    DX21StatusRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp);
+    DX21StatusRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp, int16_t type);
 
 public:
     uint8_t deviceId;
     uint8_t channelId;
+    int16_t statusType;
     int64_t timestamp;
 };
 
@@ -171,10 +177,10 @@ public:
     /// @return The version number of firmware.
     DEXHAND_API virtual uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) = 0;
 
-    /// Set the safe value of electric current of an indicated motor drive in your DexHand product. The DexHand firmware
-    /// will drive the motor in particular patterns under different control modes to protect the motor and mechanic units
-    /// like gears, strings etc. DexHand product user manual explains the details of different control modes, and how safe
-    /// current plays a role in it.
+    /// Set the safe value of electric current(maximum allowed) of motor drive of specified finger in your DexHand product.
+    /// The DexHand firmware will drive the motor in particular patterns under different control modes to protect the motor
+    /// and mechanic units like gears, strings etc. DexHand product user manual explains the details of different control
+    /// modes, and how safe current plays a role in it.
     /// @param deviceId The ID number of your DexHand product, AKA hand ID.
     /// @param fingerId The ID number of the indicated finger on your DexHand product.
     /// @param jointPosition Position ID of a specific joint, if this joint has an independent motor drive. This ID
@@ -183,6 +189,14 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API virtual bool setSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
         uint16_t maxCurrent) = 0;
+
+    /// Get the safe value of electric current(maximum allowed) of motor drive of specified finger in your DexHand product.
+    /// @param deviceId The ID number of your DexHand product, AKA hand ID.
+    /// @param fingerId The ID number of the indicated finger on your DexHand product.
+    /// @param jointPosition Position ID of a specific joint, if this joint has an independent motor drive. This ID
+    /// must be evaluated by enum class JointMotor.
+    /// @return Value of the maximum allowed working current of the motor.
+    DEXHAND_API virtual uint16_t getSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) = 0;
 
     /// Set the safe value of pressure(maximum allowed) of an indicated position of a finger, which is reflected by one
     /// or a group of tactile sensors on the finger. The safe pressure value works as threshold to guarantee the motor
@@ -209,6 +223,14 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API virtual bool setSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
         uint8_t maxTemperature) = 0;
+
+    /// Get the safe value of working temperature(maximum allowed) of an indicated finger or motor.
+    /// @param deviceId The ID number of your DexHand product, AKA hand ID.
+    /// @param fingerId The ID number of the indicated finger on your DexHand product.
+    /// @param jointPosition Position ID of a specific joint, if this joint has an independent temperature sensor. This ID
+    /// must be evaluated by enum class JointMotor. For DexHand021 and 021S, this argument is reserved.
+    /// @return Value of maximum allowed working temperature of the indicated motor.
+    DEXHAND_API virtual uint8_t getSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) = 0;
 
     /// Set realtime status data sampling ON or OFF for a specified finger of DexHand product.
     /// @param deviceId The ID number of your DexHand product, AKA hand ID.
@@ -491,9 +513,9 @@ public:
     /// @param callback Callback function to be registered.
     DEXHAND_API void setParamRWCallback(const ParamRwMessageCallBack &callback) const override;
 
-    /// Set the safe value of working electric current for specified motor drive in your DexHand021 device. Refer to
-    /// user manual for how "safe current" works in different control modes and workloads, to protect your DexHand021
-    /// device.
+    /// Set the allowed maximum value of working electric current for specified motor drive in your DexHand021 device.
+    /// Refer to user manual for how "safe current" works in different control modes and workloads, to protect your
+    /// DexHand021 device.
     /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
     /// @param fingerId The ID number of the specified finger of your DexHand021 device.
     /// @param jointPosition Position ID of a specific joint, Acceptable values are evaluated by enum class JointMotor,
@@ -502,6 +524,15 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API bool
     setSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxCurrent) override;
+
+    /// Get the allowed maximum value of working electric current for specified motor drive in your DexHand021 device.
+    /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger of your DexHand021 device.
+    /// @param jointPosition Position ID of a specific joint, Acceptable values are evaluated by enum class JointMotor,
+    /// 0x01 for distal joint, 0x02 for proximal joint, and 0x03 for both.
+    /// @return Value of the allowed maximum current of the motor.
+    DEXHAND_API uint16_t
+    getSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
 
     /// Set the safe value of pressure(maximum allowed) for specified finger or motor of your DexHand021 device. Corresponding
     /// motor drive immediately brakes once the tactile sensor detects the pressure on finger reaches safe value.
@@ -524,6 +555,14 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API bool setSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
         uint8_t maxTemperature) override;
+
+    /// Get the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand021 device.
+    /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger on your DexHand021 device.
+    /// @param jointPosition Position ID of a specific joint. A DexHand021 device does not individually sampling temperature for
+    /// each motors of a finger(every finger possesses 2 motors for MCP and PIP/DIP), thus this argument is ignored.
+    /// @return Value of maximum allowed working temperature of this motor.
+    DEXHAND_API uint8_t getSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
 
     /// Set realtime sampling for status data ON or OFF for a specified finger of DexHand021 device.
     /// @param deviceId User assigned ID number of your DexHand021 product, AKA hand ID assigned by method setHandId().
@@ -717,6 +756,14 @@ public:
     DEXHAND_API bool
     setSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxCurrent) override;
 
+    /// Get the safe value of working electric current for specified motor drive in your DexHand_021S device.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger of your 021S device.
+    /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
+    /// @return Value of maximum allowed working current of the motor.
+    DEXHAND_API uint16_t
+    getSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
+
     /// Set the safe value of pressure(maximum allowed) for specified finger or motor of your DexHand021 device. Corresponding
     /// motor drive immediately brakes once the tactile sensor detects the pressure on finger reaches safe value.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
@@ -736,6 +783,13 @@ public:
     /// @return true for success, false for failure.
     DEXHAND_API bool setSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
         uint8_t maxTemperature) override;
+
+    /// Get the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand_021S device.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger on your 021S device.
+    /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
+    /// @return Value of maximum allowed working temperature of the motor.
+    DEXHAND_API uint8_t getSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
 
     /// Set realtime sampling for status data ON or OFF for a specified finger of DexHand021 device.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().

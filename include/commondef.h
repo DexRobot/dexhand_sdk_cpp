@@ -1,11 +1,12 @@
 #pragma once
 
+#include <vector>
+
 #ifdef WIN32
 #include <windows.h>
 #include <typedef.h>
 #else
 #endif
-
 
 #define MAX_ERROR_MSG_LEN 255
 
@@ -104,13 +105,55 @@ enum ErrorType
     MotorOverHeat  = 0xFF,
 };
 
-enum MotorErrorCode
+struct MotorErrorMsg
+{
+    uint8_t  motorId;
+    uint8_t  errorType;
+    uint16_t errorCode;
+    char errorMsg[256];
+
+    MotorErrorMsg() = delete;
+    explicit MotorErrorMsg(const uint8_t motorId);
+};
+
+struct ErrorMessageRx
+{
+    uint8_t channelId;
+    uint8_t deviceId;
+    std::vector<MotorErrorMsg> motorErrors;
+
+    ErrorMessageRx() = delete;
+    explicit ErrorMessageRx(const uint8_t chnId, const uint8_t fgrId);
+};
+
+enum class MotorErrorCode : int32_t
 {
     NONE_ERROR   = 0x0000,
     CRT_OVERLOAD = 0x0001,
     HALL_ERROR   = 0x0002,
     ROLL_BLOCKED = 0x0004,
     ADC_ERROR    = 0x0008,
+};
+
+enum class MotorErrorCode_21S : int32_t
+{
+    NONE_ERROR = 0x0000,
+    CRT_ERROR  = 0x0001,
+    VTG_ERROR  = 0x0002,
+    OVER_HEAT  = 0x0004,
+    MOT_BLOCK  = 0x0008,
+    MOT_ERROR  = 0x0010,
+};
+
+struct SysParameterRWRx
+{
+    uint8_t channelId;
+    uint8_t deviceId;
+    uint8_t operationType;
+    uint8_t parameterId;
+    uint8_t succeed;
+    uint8_t dataLen;
+    uint8_t results[10]; // 11 bytes may not be fully used, also for padding purpose
 };
 
 enum HandID
