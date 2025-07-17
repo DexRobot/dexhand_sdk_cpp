@@ -817,34 +817,47 @@ public:
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
     /// @param fingerId The ID number of the specified finger on your 021S device.
     /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
-    /// @param motionValue Motion value for finger to move. Accepted value is target degree*100.
-    /// @param velocity Velocity for the steering motor to move. Accepted value is degree*100 per second.
-    /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode.
+    /// @param motionArg1 First motion argument for finger to move. This argument represents different semantics under
+    /// different control mode. For 0x55 mode, this value represents HALL position of motor, accepted value are in range
+    /// [0, 1000]. For 0x44 and 0x66 mode, this value represents target degree*10 of finger joint, accepted value are in
+    /// range [0, 750] for finger 1~3, and [0, 1600] for revolving joint(ID 4).
+    /// @param motionArg2 Second motion argument for the steering motor to move. As same as motionArg1, it takes different
+    /// semantics under different control mode. For 0x55, it's the velocity of steering motor, in degree*100 per seconds,
+    /// accepted value between [0, 32767]. For 0x66, it represents torque to drive the motor, internally it is calculated
+    /// via PWM, accepted value is between [200, 800]. For 0x44, it is ignored.
+    /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode,
+    /// including HALL_POSLIMIT_CONTROL_MODE(aka 0x55), CASCADED_PID_CONTROL_MODE(aka 0x44), CASCADED_MIT_CONTROL_MODE(aka 0x66)
     /// @param delay Number of milliseconds for delaying execution of this instruction, if user does not want it to
     /// be executed immediately.
     /// @return true if the instruction is sent successfully, false if it is not.
     DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition
-      , int16_t motionValue, int16_t velocity, MotorControlMode mode, int32_t delay) override;
+      , int16_t motionArg1, int16_t motionArg2, MotorControlMode mode, int32_t delay) override;
 
     /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
     /// values of expected motion, via given control mode.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
     /// @param fingerId The ID number of the specified finger on your 021S device.
     /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
-    /// @param motionValue Motion value for finger to move. Accepted value is target degree*100.
-    /// @param velocity Velocity for the steering motor to move. Accepted value is degree*100 per second.
+    /// @param motionArg1 First motion argument for finger to move. This argument represents different semantics under
+    /// different control mode. For 0x55 mode, this value represents HALL position of motor, accepted value are in range
+    /// [0, 1000]. For 0x44 and 0x66 mode, this value represents target degree*10 of finger joint, accepted value are in
+    /// range [0, 750] for finger 1~3, and [0, 1600] for revolving joint(ID 4).
+    /// @param motionArg2 Second motion argument for the steering motor to move. As same as motionArg1, it takes different
+    /// semantics under different control mode. For 0x55, it's the velocity of steering motor, in degree*100 per seconds,
+    /// accepted value between [0, 32767]. For 0x66, it represents torque to drive the motor, internally it is calculated
+    /// via PWM, accepted value is between [0, 800]. For 0x44, it is ignored.
     /// @param mode Control mode of how the motor is driven. Acceptable values are evaluated by enum MotorControlMode.
     /// @return true if the instruction is sent successfully, false if it is not.
     DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition
-      , int16_t motionValue, int16_t velocity, MotorControlMode mode) override;
+      , int16_t motionArg1, int16_t motionArg2, MotorControlMode mode) override;
 
     /// Send an action control instruction to specified finger and joint of a specified DexHand_021S device, with given
-    /// values of expected motion, via deteremined HALL_POSITION_CONTROL_MODE.
+    /// values of expected motion, via deteremined HALL_POSLIMIT_CONTROL_MODE control mode.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
     /// @param fingerId The ID number of the specified finger on your 021S device.
     /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
-    /// @param motionValue Motion value for finger to move. Accepted value is target degree*100.
-    /// @param velocity Velocity for the steering motor to move. Accepted value is degree*100 per second.
+    /// @param motionValue Motion value for finger to move. Accepted value is target degree*10.
+    /// @param velocity Velocity for the steering motor to move. Accepted value is degree*10 per second.
     /// @return true if the instruction is sent successfully, false if it is not.
     DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition
       , int16_t motionValue, int16_t velocity);
