@@ -37,6 +37,7 @@ enum class ProductType : int
 
 enum class AdapterType : int
 {
+    UNKNOW   = -0x01,
     ZLG_200U = 33,
     ZLG_MINI = 42,
     LYS_MINI = 43,
@@ -66,11 +67,15 @@ struct DX21Instruction
 class DX21StatusRxData
 {
 public:
+    using PTR = std::shared_ptr<DX21StatusRxData>;
+
+public:
     DX21StatusRxData() = delete;
     virtual ~DX21StatusRxData() = default;
 
     static DX21StatusRxData * load(ProductType pdType, uint8_t channelId, uint8_t deviceId, const unsigned char * payload);
 
+    DEXHAND_API virtual void update(const DX21StatusRxData *)=0;
     DEXHAND_API virtual void update(const unsigned char *) = 0;
     [[nodiscard]] DEXHAND_API virtual const unsigned char * data() const = 0;
     [[nodiscard]] DEXHAND_API virtual int16_t hallValue(uint8_t motorId) const = 0;
