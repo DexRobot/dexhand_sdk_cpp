@@ -130,6 +130,7 @@ int main(int argc, const char ** argv)
     hand->setHandId(AdapterChannel::CHN0, handId);
     hand->setRealtimeResponse(handId, 0x00, 50, bListen);
 
+    /*
     bool exitflg = false;
     do
     {
@@ -182,6 +183,7 @@ int main(int argc, const char ** argv)
 
         free(line);
     } while(exitflg != true);
+    */
 
     return 0;
 }
