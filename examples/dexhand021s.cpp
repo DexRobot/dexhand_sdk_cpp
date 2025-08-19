@@ -13,28 +13,28 @@ void CallbackFunc(const DX21StatusRxData * status)
 {
     //printf("BoradTemp = %d\n", status->boardTemper);
     printf("Position1 = %d, Speed1 = %d, Current1=%d, MT Temp1=%d\n"
-        , status->MotorHallValue(0)
-        , status->MotorVelocity(0)
-        , status->MotorCurrent(0)
-        , status->MotorTemperature(0));
-
-    printf("Position2 = %d, Speed2 = %d, Current2=%d, MT Temp2=%d\n"
         , status->MotorHallValue(1)
         , status->MotorVelocity(1)
         , status->MotorCurrent(1)
         , status->MotorTemperature(1));
 
-    printf("Position3 = %d, Speed3 = %d, Current3=%d, MT Temp3=%d\n"
+    printf("Position2 = %d, Speed2 = %d, Current2=%d, MT Temp2=%d\n"
         , status->MotorHallValue(2)
         , status->MotorVelocity(2)
         , status->MotorCurrent(2)
         , status->MotorTemperature(2));
 
-    printf("Position4 = %d, Speed4 = %d, Current4=%d, MT Temp4=%d\n"
+    printf("Position3 = %d, Speed3 = %d, Current3=%d, MT Temp3=%d\n"
         , status->MotorHallValue(3)
         , status->MotorVelocity(3)
         , status->MotorCurrent(3)
         , status->MotorTemperature(3));
+
+    printf("Position4 = %d, Speed4 = %d, Current4=%d, MT Temp4=%d\n"
+        , status->MotorHallValue(4)
+        , status->MotorVelocity(4)
+        , status->MotorCurrent(4)
+        , status->MotorTemperature(4));
 
     printf("\n");
 }
@@ -81,6 +81,106 @@ void show_usage()
     std::cout << "\t-l, optional, use for whether listening to realtime response or not" << std::endl;
 }
 
+void CANFDTest(const AdapterType atype, bool bListen)
+{
+    const auto device = DexHand::createInstance(ProductType::DX021_S, atype, 0);
+    const auto hand = std::dynamic_pointer_cast<DexHand_021S>(device);
+
+    DH21StatusRxCallBack callback = std::bind(CallbackFunc, std::placeholders::_1);
+    hand->setStatusRxCallback(callback);
+
+    if(!hand->connect(true))
+    {
+        std::cout << "Connection failure." << std::endl;
+        exit(-1);
+    }
+
+    uint8_t deviceId = 0x01;
+
+    hand->setHandId(AdapterChannel::CHN0, deviceId);
+    hand->setRealtimeResponse(deviceId, 0x00, 50, bListen);
+
+    auto firmwareVersion = hand->getFirmwareVersion(deviceId, 0x00);
+    std::cout << "Firmware version = " << std::to_string(firmwareVersion) << std::endl;
+
+    auto maxCurrent = hand->getSafeCurrent(deviceId, 0x01);
+    std::cout << "Limited Max Current = " << std::to_string(maxCurrent) << std::endl;
+
+    auto maxTemperature = hand->getSafeTemperature(deviceId, 0x01);
+    std::cout << "Limited Max Temperature = " << std::to_string(maxTemperature) << std::endl;
+
+    hand->clearFirmwareError(deviceId, 0x00);
+    hand->resetJoints(deviceId);
+
+    hand->clearFirmwareError(deviceId, 0x00);
+
+    for(int i=0; i < 10; ++i)
+    {
+        hand->moveFinger(deviceId, 0x01, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x02, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x03, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->clearFirmwareError(deviceId, 0x00);
+        usleep(1000*1500);
+
+        hand->moveFinger(deviceId, 0x01, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x02, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x03, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->clearFirmwareError(deviceId, 0x00);
+        usleep(1000*1500);
+    }
+
+    hand->resetJoints(deviceId);
+}
+
+void RTU485Test(const std::string & portName)
+{
+    const auto device = DexHand::DexHand::createInstance(ProductType::DX021_S, portName.c_str());
+    const auto hand = std::dynamic_pointer_cast<DexHand_021S>(device);
+
+    if(!hand->connect(true))
+    {
+        std::cout << "Connection failure." << std::endl;
+        exit(-1);
+    }
+
+    uint8_t deviceId = 0x01;
+
+    /// For 485 user, this step is a must, for 485 protocols does not support to retrieve the
+    /// device ID when user does NOT even know it. Device ID to be known is a prerequisite 
+    hand->setHandId(AdapterChannel::CHN0, deviceId);
+
+    auto firmwareVersion = hand->getFirmwareVersion(deviceId, 0x00);
+    std::cout << "Firmware version = " << std::to_string(firmwareVersion) << std::endl;
+
+    auto maxCurrent = hand->getSafeCurrent(deviceId, 0x01);
+    std::cout << "Limited Max Current = " << std::to_string(maxCurrent) << std::endl;
+
+    auto maxTemperature = hand->getSafeTemperature(deviceId, 0x01);
+    std::cout << "Limited Max Temperature = " << std::to_string(maxTemperature) << std::endl;
+
+    hand->clearFirmwareError(deviceId, 0x00);
+    hand->resetJoints(deviceId);
+
+    hand->clearFirmwareError(deviceId, 0x00);
+
+    for(int i=0; i < 10; ++i)
+    {
+        hand->moveFinger(deviceId, 0x01, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x02, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x03, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->clearFirmwareError(deviceId, 0x00);
+        usleep(1000*1500);
+
+        hand->moveFinger(deviceId, 0x01, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x02, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->moveFinger(deviceId, 0x03, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
+        hand->clearFirmwareError(deviceId, 0x00);
+        usleep(1000*1500);
+    }
+
+    hand->resetJoints(deviceId);
+}
+
 
 int main(int argc, const char ** argv)
 {
@@ -97,13 +197,17 @@ int main(int argc, const char ** argv)
     {
         atype = AdapterType::ZLG_200U;
     }
-    else if(0 == strncmp(argv[1], "-zlgm", 6))
+    else if(0 == strncmp(argv[1], "-zlgm", 5))
     {
         atype = AdapterType::ZLG_MINI;
     }
-    else if(0 != strncmp(argv[1], "-lys", 4))
+    else if(0 == strncmp(argv[1], "-lys", 4))
     {
         atype = AdapterType::LYS_MINI;
+    }
+    else if(0 == strncmp(argv[1], "-485", 4))
+    {
+        atype = AdapterType::USB2_485;
     }
     else
     {
@@ -114,76 +218,14 @@ int main(int argc, const char ** argv)
     if(argc == 3 && (0 == strncmp(argv[2], "-l", 2)))
         bListen = true;
 
-    auto hand = DexHand::createInstance(ProductType::DX021_S, atype, 0);
-
-    DH21StatusRxCallBack callback = std::bind(CallbackFunc, std::placeholders::_1);
-    hand->setStatusRxCallback(callback);
-
-    if(!hand->connect(true))
+    if(atype != AdapterType::USB2_485)
     {
-        std::cout << "Connection failure." << std::endl;
-        exit(-1);
+        CANFDTest(atype, bListen);
     }
-
-    uint8_t handId = 0x02;
-
-    hand->setHandId(AdapterChannel::CHN0, handId);
-    hand->setRealtimeResponse(handId, 0x00, 50, bListen);
-
-    /*
-    bool exitflg = false;
-    do
+    else
     {
-        printf("DexHand-021S>: ");
-        char * line = CmdReadLine();
-
-        if(strlen(line) == 0)
-        {
-            free(line);
-            continue;
-        }
-
-        std::vector<std::string> args;
-        DexRobot::split(args, line, " ");
-
-        if (strcasecmp(line, "exit") == 0
-                || strcasecmp(line, "quit") == 0)
-        {
-            exitflg = true;
-            hand->setRealtimeResponse(handId, 0x00, 50, false);
-        }
-        else
-        {
-            if(args.size() != 4)
-            {
-                free(line);
-                std::cout << "[ERROR]: Incomplete execution arguments" << std::endl;
-                std::cout << "USAGE: <device_id> <finger_id> <degree> <velocity>" << std::endl;
-                std::cout << "ARGUMENTS:" << std::endl;
-                std::cout << "  device_id:\tFor DX021S, AKA hand ID, can be updated by user via API" << std::endl;
-                std::cout << "  finger_id:\tFor DX021S, it's between [1, 12]" << std::endl;
-                std::cout << "  degree:\tFor DX021S, it's the value of target degree*100 for steering motor" << std::endl;
-                std::cout << "  velocity:\tFor DX021S, it's the value of running degree*100 of steering motor per second" << std::endl;
-                continue;
-            }
-
-            uint8_t  deviceId = strtoint(args[0].c_str(), nullptr, 10);
-            uint8_t  fingerId = strtoint(args[1].c_str(), nullptr, 10);
-            uint16_t degree   = strtoint(args[2].c_str(), nullptr, 10);
-            uint16_t velocity = strtoint(args[3].c_str(), nullptr, 10);
-
-            if(deviceId != handId)
-            {
-                std::cout << "Device " << deviceId << " is not connected" << std::endl;
-                continue;
-            }
-
-            hand->moveFinger(deviceId, fingerId, 0x0, degree, velocity, MotorControlMode::HALL_POSITION_CONTROL_MODE);
-        }
-
-        free(line);
-    } while(exitflg != true);
-    */
+        RTU485Test("/dev/ttyUSB0");
+    }
 
     return 0;
 }

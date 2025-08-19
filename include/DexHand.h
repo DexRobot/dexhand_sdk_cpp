@@ -41,7 +41,7 @@ enum class AdapterType : int
     ZLG_200U = 33,
     ZLG_MINI = 42,
     LYS_MINI = 43,
-    USB2_485,
+    USB2_485 = 485,
 };
 
 enum class AdapterChannel : int
@@ -51,17 +51,6 @@ enum class AdapterChannel : int
     CHN1,
     CHN2,
     CHN3,
-};
-
-struct DX21Instruction
-{
-    uint8_t channel;
-    uint8_t deviceId;
-    uint8_t fingerId;
-    uint8_t subDeviceId;
-    int16_t controlArg1;
-    int16_t controlArg2;
-    MotorControlMode mode;
 };
 
 class DX21StatusRxData
@@ -161,8 +150,18 @@ public:
     /// @param adpaterIndex The index identified by system USB port of your adapter, start from 0.
     DEXHAND_API static PTR createInstance(ProductType productType, AdapterType adapterType, uint8_t adpaterIndex);
 
+    /// To create an interactable instance of DexHand product connect to a serial port, particularly a RTU485 adapter.
+    /// For now only DexHand_021S supports RTU485.
+    /// @param productType The specific type of your DexHand product.
+    /// @param serialPortName The name of the serial port which your RTU485 adapter connects to.
+    DEXHAND_API static PTR createInstance(ProductType productType=ProductType::DX021_S, const char * serialPortName="/dev/ttyUSB0");
+
+    /// Get the number of connected DexHand devices on the adapter of this instance.
+    /// @return The number of workable DexHand devices.
     DEXHAND_API [[nodiscard]] uint8_t numberOfDevices() const;
 
+    /// Get the number of channels on which there are DexHand devices connected.
+    /// @return The number of workable channels.
     DEXHAND_API [[nodiscard]] std::vector<AdapterChannel> channels() const;
 
     /// Establish connection between your program and the communication adapter your DexHand product is plugged in.
@@ -397,6 +396,15 @@ public:
     /// @param fingerId ID number of target finger, which encounteres any error you want to clear.
     DEXHAND_API virtual void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) = 0;
 
+    /// Clear firmware errors on specified finger of a specified DexHand device, for example motor blocking error causes
+    /// protection. For elaboration of possible errors, please refer to our product user manual.
+    /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
+    /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
+    /// not execute any of your subsequent control instructions after you already called this function.
+    /// @param deviceId Device ID of the DexHand.
+    /// @param fingerId ID number of target finger, which encounteres any error you want to clear.
+    DEXHAND_API virtual void clearFirmwareError(uint8_t deviceId, uint8_t fingerId) = 0;
+
     /// Reboot the specified device connected on specified channel.
     /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
     /// @param deviceId Target ID number of device you want to reboot. For DX021, this paramter represents finger ID. For
@@ -406,6 +414,10 @@ public:
     /// Reset all finger joints back to initial state position.
     /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
     DEXHAND_API virtual void resetJoints(AdapterChannel channel) = 0;
+
+    /// Reset all finger joints back to initial state position.
+    /// @param deviceId Device ID of the DexHand.
+    DEXHAND_API virtual void resetJoints(uint8_t deviceId) = 0;
 
 protected:
     DexHand(AdapterType, uint8_t adpaterIndex);
@@ -487,14 +499,23 @@ public:
     /// @return The version number of firmware.
     DEXHAND_API uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) override;
 
-    /// Clear firmware errors on specified finger on DX021 device of specified CANFD adapter channel. For elaboration
-    /// of possible errors, please refer to our product user manual.
+    /// Clear firmware errors on specified finger on a DX021 device. For elaboration of possible errors, please refer
+    /// to our product user manual.
     /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
     /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
     /// not execute any of your subsequent control instructions after you already called this function.
     /// @param channel Channel number on which the connected DexHand device you want to clear the errors.
     /// @param fingerId ID number of target finger, which encounteres any error you want to clear.
     DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) override;
+
+    /// Clear firmware errors on specified finger on DX021 device of specified CANFD adapter channel. For elaboration
+    /// of possible errors, please refer to our product user manual.
+    /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
+    /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
+    /// not execute any of your subsequent control instructions after you already called this function.
+    /// @param deviceId Channel number on which the connected DexHand device you want to clear the errors.
+    /// @param fingerId ID number of target finger, which encounteres any error you want to clear.
+    DEXHAND_API void clearFirmwareError(uint8_t deviceId, uint8_t fingerId) override;
 
     /// Reboot the specified device connected on specified channel.
     /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
@@ -504,6 +525,10 @@ public:
     /// Reset all finger joints back to initial state position.
     /// @param channel Target channel of the adapter, on wich the DX021 device is connected.
     DEXHAND_API void resetJoints(AdapterChannel channel) override;
+
+    /// Reset all finger joints back to initial state position.
+    /// @param deviceId ID of the DexHand-021 device.
+    DEXHAND_API void resetJoints(uint8_t deviceId) override;
 
     /// Register a callback function for processing the status feedback data of your DexHand021 device.
     /// @param callback Callback function to be registered.
@@ -654,9 +679,13 @@ public:
     /// adapter type includes ZLG USBCANFD-200U, USBCANFD-100U-mini, LYS USBCANFD-Mini.
     /// @param adapterType The specific type of your adapter.
     /// @param adpaterIndex The index identified by system USB port of your adapter, start from 0.
-    /// @param listen A flag to indicate whether you want your program to listen to response data of DexHand_021S in
-    /// realtime mode or not.
-    DEXHAND_API DexHand_021S(AdapterType adapterType, uint8_t adpaterIndex);
+    /// @param adapterName For RTU485 adapter only, if user uses RTU485 protocol to communicate with DexHand021S device.
+    /// Normally, on linux, this is the serial port device name under /dev like ttyUSB0 or some other similar things.
+    DEXHAND_API DexHand_021S(AdapterType adapterType, uint8_t adpaterIndex, const char * adapterName="/dev/ttyUSB0");
+
+    /// Constructer create an instance of DexHand_021S device is connected to a serial port, particularly RTU485 adapter.
+    /// @param adapterName The serial port name of your RTU485 adapter.
+    DEXHAND_API explicit DexHand_021S(const char * adapterName="/dev/ttyUSB0");
 
     ~DexHand_021S() override;
 
@@ -679,21 +708,23 @@ public:
     /// and you can read the Hand ID by calling handID() method if you wish, or you can memorize and manage the ID
     /// numbers for each device in your own code of your application.
     /// @param channel Target channel of the adapter.
-    /// @param handId Given ID will be assigned to the connected hand.
+    /// @param handId Given ID will be assigned to the connected hand. This argument will be ignored if using 485
+    /// connection.
     /// @return This function won't return until it successfully writes the given ID to firmware of device, or the
     /// write process timed out. Please call errorCode() after this function returns, to make sure the given device
     /// ID is successfully written.
     DEXHAND_API void setHandId(AdapterChannel channel, uint8_t handId) override;
 
     /// Confirm if the hand of given deviceID is connected/alive on specified adapter channel
-    /// @param channel Target channel of the adapter.
+    /// @param channel Target channel of the adapter. This argument will be ignored if using 485 connection.
     /// @param deviceId ID number of hand.
     /// @return True if the expected hand is connected and alive, false if it is not.
     DEXHAND_API [[nodiscard]] bool isAlive(AdapterChannel channel, uint8_t deviceId) override;
 
     /// A blocking method to get the assigned ID number of the hand is connected to specified channel of adapter.
     /// The method won't return until the device firmware sends feedback of its own ID.
-    /// @param channel Given channel of the adapter, with a DexHand_021S device connected.
+    /// @param channel Given channel of the adapter, with a DexHand_021S device connected. This argument will be
+    /// ignored if using 485 connection.
     /// @return ID of hand of the corresponding channel.
     DEXHAND_API [[nodiscard]] uint8_t handID(AdapterChannel channel) override;
 
@@ -717,14 +748,23 @@ public:
     /// @return The version number of firmware.
     DEXHAND_API uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) override;
 
-    /// Clear firmware errors on specified DX021-S finger of specified CANFD adapter channel. For elaboration
-    /// of possible errors, please refer to our product user manual.
+    /// Clear firmware errors of a DexHand-021S device on specific adapter channel. For elaboration of possible errors,
+    /// please refer to our product user manual.
     /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
     /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
     /// not execute any of your subsequent control instructions after you already called this function.
     /// @param channel Channel number on which the connected DexHand device you want to clear the errors.
     /// @param deviceId ID number of target device, which encounteres any error you want to clear.
     DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t deviceId) override;
+
+    /// Clear firmware errors of a DexHand-021S device. For elaboration of possible errors, please refer to our product
+    /// user manual.
+    /// NOTICE: this is a non-blocking call, meaning it returns directly after it sends instruction to device firmware,
+    /// and won't wait for device firmware to finished its process. You can try to call this again if your device does
+    /// not execute any of your subsequent control instructions after you already called this function.
+    /// @param deviceId ID number of the DexHand-021S device.
+    /// @param fingerId ID number of target finger, ignored.
+    DEXHAND_API void clearFirmwareError(uint8_t deviceId, uint8_t fingerId) override;
 
     /// Reboot the specified device connected on specified channel.
     /// @param channel Target channel of the adapter, on wich the DexHand device is connected.
@@ -736,6 +776,10 @@ public:
     /// Reset all finger joints back to initial state position.
     /// @param channel Target channel of the adapter, on wich the DX021-S device is connected.
     DEXHAND_API void resetJoints(AdapterChannel channel) override;
+
+    /// Reset all finger joints back to initial state position.
+    /// @param deviceId Device ID of the DexHand-021S product.
+    DEXHAND_API void resetJoints(uint8_t deviceId) override;
 
     /// Register a callback function for processing the status feedback data of your DexHand_021S device.
     /// @param callback Callback function to be registered.
@@ -755,11 +799,28 @@ public:
     /// device.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
     /// @param fingerId The ID number of the specified finger of your 021S device.
+    /// @param maxCurrent Given value of expected safe electric current.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool
+    setSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint16_t maxCurrent);
+
+    /// Set the safe value of working electric current for specified motor drive in your DexHand_021S device. Refer to
+    /// user manual for how "safe current" works in different control modes and workloads, to protect your DexHand_021S
+    /// device.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger of your 021S device.
     /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
     /// @param maxCurrent Given value of expected safe electric current.
     /// @return true for success, false for failure.
     DEXHAND_API bool
     setSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxCurrent) override;
+
+    /// Get the safe value of working electric current for specified motor drive in your DexHand_021S device.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger of your 021S device.
+    /// @return Value of maximum allowed working current of the motor.
+    DEXHAND_API uint16_t
+    getSafeCurrent(uint8_t deviceId, uint8_t fingerId);
 
     /// Get the safe value of working electric current for specified motor drive in your DexHand_021S device.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
@@ -783,11 +844,25 @@ public:
     /// Firmware stops accepting any control instruction once the temperature of motor or curcuit board reaches the safe value.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
     /// @param fingerId The ID number of the specified finger on your 021S device.
+    /// @param maxTemperature Given value of expected safe temperature.
+    /// @return true for success, false for failure.
+    DEXHAND_API bool setSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t maxTemperature);
+
+    /// Set the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand_021S device.
+    /// Firmware stops accepting any control instruction once the temperature of motor or curcuit board reaches the safe value.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger on your 021S device.
     /// @param jointPosition Ignored, 021S device possesses only one motor drive for each finger.
     /// @param maxTemperature Given value of expected safe temperature.
     /// @return true for success, false for failure.
     DEXHAND_API bool setSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
-        uint8_t maxTemperature) override;
+    uint8_t maxTemperature) override;
+
+    /// Get the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand_021S device.
+    /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
+    /// @param fingerId The ID number of the specified finger on your 021S device.
+    /// @return Value of maximum allowed working temperature of the motor.
+    DEXHAND_API uint8_t getSafeTemperature(uint8_t deviceId, uint8_t fingerId);
 
     /// Get the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand_021S device.
     /// @param deviceId User assigned ID number of your 021S device, AKA hand ID assigned by method setHandId().
@@ -870,6 +945,16 @@ public:
     /// Get the prooduct type of this hand instance.
     /// @return Always ProductType::DX021_S
     DEXHAND_API [[nodiscard]] ProductType productType() const override;
+
+    /// Get status data of this moment from DexHand-021S device connected via 485 adapter, including motor current, velocity,
+    /// temperature, tactile data, etc. This interface works only on RTU485 adapter, vice versa, status data of a DexHand-021S
+    /// device can only be retrieved via this interface, rather than any other interface works for CANFD.
+    /// @return A shared pointer of DX21StatusRxData, which carries the status data of this device.
+    DEXHAND_API [[nodiscard]] DX21StatusRxData::PTR HandStatus485();
+
+private:
+    class RTU485Impl;
+    std::shared_ptr<RTU485Impl> rtu485Impl;
 };
 
 /*
