@@ -87,12 +87,16 @@ public:
 
 protected:
     DX21StatusRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp, int16_t type);
+    [[nodiscard]] bool isFullFill() const;
 
 public:
     uint8_t deviceId;
     uint8_t channelId;
     int16_t statusType;
     int64_t timestamp;
+
+protected:
+    uint8_t mask;
 };
 
 typedef std::function<void (const Dex021::DX21StatusRxData *)> DH21StatusRxCallBack;
