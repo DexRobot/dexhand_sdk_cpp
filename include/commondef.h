@@ -85,6 +85,7 @@ enum class SysErrorCode
     ADAPTER_NA,
     CONN_LOST,
     COMM_TIMEOUT,
+    BOOT_FAILURE,
 };
 
 enum MotorControlMode
