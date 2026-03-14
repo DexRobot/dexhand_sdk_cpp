@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #ifdef WIN32
@@ -78,13 +79,24 @@ typedef unsigned char byte;
 
 namespace DexRobot
 {
+enum class LOG_LEVEL
+{
+    DX_CLOSE = 0,
+    DX_FATAL,
+    DX_ERROR,
+    DX_WARN,
+    DX_INFO,
+    DX_DEBUG,
+};
+
 
 enum class SysErrorCode
 {
     NONE = 0,
     ADAPTER_NA,
+    DEV_TYPE_MISMATCH,
     CONN_LOST,
-    COMM_TIMEOUT,
+    CONN_TIMEOUT,
     BOOT_FAILURE,
 };
 
@@ -121,19 +133,20 @@ struct ErrorMessageRx
 {
     uint8_t channelId;
     uint8_t deviceId;
+    int16_t overloadError;
     std::vector<MotorErrorMsg> motorErrors;
 
     ErrorMessageRx() = delete;
-    explicit ErrorMessageRx(const uint8_t chnId, const uint8_t fgrId);
+    ErrorMessageRx(const uint8_t chnId, const uint8_t fgrId, const int16_t overloadErrCode);
 };
 
 enum class MotorErrorCode : int32_t
 {
-    NONE_ERROR   = 0x0000,
-    CRT_OVERLOAD = 0x0001,
-    HALL_ERROR   = 0x0002,
-    ROLL_BLOCKED = 0x0004,
-    ADC_ERROR    = 0x0008,
+    NONE_ERROR = 0x0000,
+    OVERLOADED = 0x0001,
+    HALL_ERROR = 0x0002,
+    MOT_BLOCK  = 0x0004,
+    ANG_ERROR  = 0x0008,
 };
 
 enum class MotorErrorCode_21S : int32_t
