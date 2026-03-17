@@ -6,6 +6,7 @@
 
 #include <map>
 #include <memory>
+#include <string>
 #include <functional>
 #include "commondef.h"
 
@@ -38,7 +39,13 @@ enum class ProductType : int
 enum class AdapterType : int
 {
     UNKNOW   = -0x01,
+
+#ifdef WIN32
+    ZLG_200U = 41,
+#else
     ZLG_200U = 33,
+#endif
+
     ZLG_MINI = 42,
     LYS_MINI = 43,
     USB2_485 = 485,
@@ -80,6 +87,7 @@ public:
     [[nodiscard]] DEXHAND_API virtual   float TangentForce(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual int32_t NormalForceDelta(uint8_t subDeviceId) const = 0;
     [[nodiscard]] DEXHAND_API virtual int32_t TangentForceDelta(uint8_t subDeviceId) const = 0;
+    [[nodiscard]] DEXHAND_API virtual int16_t TangentForceAngle(uint8_t subDeviceId) const = 0;
 
     [[nodiscard]] DEXHAND_API virtual float   Voltage() const = 0;
     [[nodiscard]] DEXHAND_API virtual int16_t PWMValue() const = 0;
@@ -136,6 +144,8 @@ private:
     TInstance * dxInstance;
 };
 
+template<typename TProduct>
+class DexHandAdmin;
 
 class DexHand
 {
@@ -162,11 +172,11 @@ public:
 
     /// Get the number of connected DexHand devices on the adapter of this instance.
     /// @return The number of workable DexHand devices.
-    DEXHAND_API [[nodiscard]] uint8_t numberOfDevices() const;
+    [[nodiscard]] DEXHAND_API uint8_t numberOfDevices() const;
 
     /// Get the number of channels on which there are DexHand devices connected.
     /// @return The number of workable channels.
-    DEXHAND_API [[nodiscard]] std::vector<AdapterChannel> channels() const;
+    [[nodiscard]] DEXHAND_API std::vector<AdapterChannel> channels() const;
 
     /// Establish connection between your program and the communication adapter your DexHand product is plugged in.
     /// @return true for success, false for failure
@@ -304,11 +314,11 @@ public:
     /// Whether this hand instance is available or not. Normally, if the connection between the communication adapter
     /// and your program is workable, then the DexHand device instance is considered as available.
     /// @return true for available, false for not.
-    DEXHAND_API [[nodiscard]] bool isAvailable() const;
+    [[nodiscard]] DEXHAND_API bool isAvailable() const;
 
     /// Get the prooduct type of this hand instance.
     /// @return An enum value represents product type, refer to definitions of ProductType for possible values.
-    DEXHAND_API [[nodiscard]] virtual ProductType productType() const = 0;
+    [[nodiscard]] DEXHAND_API virtual ProductType productType() const = 0;
 
     /// Confirm if the control board of given device ID is connected/alive on the specified channel. This is for
     /// diagnostice purpose, or for confirming the device ID if user is not certain of the ID number of device,
@@ -352,21 +362,21 @@ public:
 
     /// Determine whether the instance is listening on the realtime feedback of the hands
     /// @return true for listening is on, flase for not.
-    DEXHAND_API [[nodiscard]] bool isListening() const;
+    [[nodiscard]] DEXHAND_API bool isListening() const;
 
     /// Get the name of communication adapter, normally the instance names the adapter after its serial number
     /// assigned by provider of the adapter.
     /// @return Name of the adapter in text
-    DEXHAND_API [[nodiscard]] const std::string &connAdapterName() const { return this->adapterName; }
+    [[nodiscard]] DEXHAND_API const std::string &connAdapterName() const { return this->adapterName; }
 
     /// Get code of current error of this instance, if there is any. Normally if anything went wrong when creating
     /// or starting the DexHand instance or adapter, error code will be set. This if for diagnostic purpose.
     /// @return The code of current error.
-    DEXHAND_API [[nodiscard]] SysErrorCode errorCode() const { return errCode; }
+    [[nodiscard]] DEXHAND_API SysErrorCode errorCode() const { return errCode; }
 
     /// Get detail message of current error.
     /// @return Detail information in text of current error.
-    DEXHAND_API [[nodiscard]] const std::string &errorMessage() const { return this->errMsg; }
+    [[nodiscard]] DEXHAND_API const std::string &errorMessage() const { return this->errMsg; }
 
     /// Register a callback function for processing the status feedback data of DexHand. Status data contains several
     /// fields representing various status of parts of a DexHand, these fields are defined in, and can be retrieved
@@ -423,6 +433,14 @@ public:
     /// @param deviceId Device ID of the DexHand.
     DEXHAND_API virtual void resetJoints(uint8_t deviceId) = 0;
 
+    /// @brief Set the logging level of data transmission
+    /// @param level Level set
+    DEXHAND_API void setTxLogLevel(LOG_LEVEL level) const;
+
+    /// @brief Set the logging level of data receiving
+    /// @param level Level set
+    DEXHAND_API void setRxLogLevel(LOG_LEVEL level) const;
+
 protected:
     DexHand(AdapterType, uint8_t adpaterIndex);
     [[nodiscard]] std::map<const AdapterChannel, uint8_t> & devices();
@@ -433,8 +451,8 @@ public:
     friend class DexHand_021S;
     friend class PredefinedGestures<DexHand_021>;
     friend class PredefinedGestures<DexHand_021S>;
-    // friend class DexHandAdmin<DexHand_021>;
-    // friend class DexHandAdmin<DexHand_021S>;
+    friend class DexHandAdmin<DexHand_021>;
+    friend class DexHandAdmin<DexHand_021S>;
 
 protected:
     AdapterType adapterType;
@@ -689,7 +707,7 @@ public:
 
     /// Constructer create an instance of DexHand_021S device is connected to a serial port, particularly RTU485 adapter.
     /// @param adapterName The serial port name of your RTU485 adapter.
-    DEXHAND_API explicit DexHand_021S(const char * adapterName="/dev/ttyUSB0");
+    DEXHAND_API explicit DexHand_021S(const char * adapterName);
 
     ~DexHand_021S() override;
 
@@ -948,13 +966,13 @@ public:
 
     /// Get the prooduct type of this hand instance.
     /// @return Always ProductType::DX021_S
-    DEXHAND_API [[nodiscard]] ProductType productType() const override;
+    [[nodiscard]] DEXHAND_API ProductType productType() const override;
 
     /// Get status data of this moment from DexHand-021S device connected via 485 adapter, including motor current, velocity,
     /// temperature, tactile data, etc. This interface works only on RTU485 adapter, vice versa, status data of a DexHand-021S
     /// device can only be retrieved via this interface, rather than any other interface works for CANFD.
     /// @return A shared pointer of DX21StatusRxData, which carries the status data of this device.
-    DEXHAND_API [[nodiscard]] DX21StatusRxData::PTR HandStatus485();
+    DEXHAND_API DX21StatusRxData::PTR HandStatus485();
 
 private:
     class RTU485Impl;
