@@ -79,6 +79,7 @@ typedef unsigned char byte;
 
 namespace DexRobot
 {
+
 enum class LOG_LEVEL
 {
     DX_CLOSE = 0,
@@ -172,9 +173,9 @@ struct SysParameterRWRx
 
 enum HandID
 {
-    None = -1,
     LEFT = 0,
-    RIGHT
+    RIGHT,
+    None = 0xFF,
 };
 
 enum FingerID
@@ -221,5 +222,64 @@ enum class JointID : uint8_t
     LF_DIP,
     LF_MCP,
 };
+
+typedef union ControlEnableMap_t
+{
+    uint16_t mask;
+
+    struct
+    {
+        uint8_t MddleProx : 1;
+        uint8_t MddleDist : 1;
+        uint8_t IndexProx : 1;
+        uint8_t IndexDist : 1;
+        uint8_t FngerSwng : 1;
+        uint8_t ThumbSwng : 1;
+        uint8_t ThumbProx : 1;
+        uint8_t ThumbDist : 1;
+        uint8_t Reserved  : 4;
+        uint8_t LttleProx : 1;
+        uint8_t LttleDist : 1;
+        uint8_t RingFProx : 1;
+        uint8_t RingFDist : 1;
+    } enables;
+} ControlEnableMap;
+
+typedef union ControlParams_t
+{
+    uint8_t mask;
+
+    struct
+    {
+        uint8_t HandType : 1;  // 0 for left hand, 1 for right hand
+        uint8_t Feedback : 1;  // 0 for disable feedback, 1 for enable
+        uint8_t ClearErr : 1;  // 0 for do NOT clear error automatically, 1 for clear
+        uint8_t Reserved : 5;
+    } params;
+} ControlParameter;
+
+typedef struct FingerControlData_t
+{
+    uint16_t DistPos;
+    uint16_t ProxPos;
+    uint16_t DistSpd;
+    uint16_t ProxSpd;
+    uint8_t  DistCur;
+    uint8_t  ProxCur;
+    uint16_t Reserve;
+} FingerControlData;
+
+typedef struct HandControlDesc_t
+{
+    MotorControlMode  mode;
+    ControlEnableMap  enableMap;
+    ControlParameter  controlParam;
+    FingerControlData thumb;
+    FingerControlData swing;
+    FingerControlData index;
+    FingerControlData middle;
+    FingerControlData ring;
+    FingerControlData little;
+} HandControlDesc;
 
 }
