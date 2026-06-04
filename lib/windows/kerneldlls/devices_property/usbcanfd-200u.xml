@@ -547,7 +547,7 @@
 				</meta>
 			</canfd_abit_baud_rate>
 			<canfd_dbit_baud_rate flag="0x0147" at_initcan="pre">
-				<value>5000000</value>
+				<value>1000000</value>
 				<meta>
 					<type>options.int32</type>
 					<desc>数据域波特率</desc>

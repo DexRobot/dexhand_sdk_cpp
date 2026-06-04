@@ -9,6 +9,13 @@
 #include <string>
 #include <functional>
 #include "commondef.h"
+#include <set>
+#include <thread>
+#include <chrono>
+#include <algorithm>
+#include <unordered_map>
+#include <atomic>
+#include <mutex>
 
 #define DX21_DEFAULT_DEVICE_ID 1
 
@@ -26,6 +33,7 @@ namespace Dex021
 
 class DexHand_021;
 class DexHand_021S;
+class DexHand_021Pro;
 
 enum class ProductType : int
 {
@@ -57,6 +65,25 @@ enum class AdapterChannel : int
     CHN1,
     CHN2,
     CHN3,
+};
+
+enum TactilePart021Pro
+{
+    THUMB_TIP = 0x00,
+    THUMB_BELLY = 0x01,
+    HAND_PALM0 = 0x02,
+    HAND_PALM1 = 0x03,
+    HAND_PALM2 = 0x04,
+    HAND_PALM3 = 0x05,
+    PICKY_TIP = 0x06,
+    PICKY_BELLY = 0x07,
+
+    INDEX_TIP = 0x10,
+    INDEX_BELLY = 0x11,
+    MIDDLE_TIP = 0x12,
+    MIDDLE_BELLY = 0x13,
+    RING_TIP = 0x14,
+    RING_BELLY = 0x15,
 };
 
 class DX21StatusRxData
@@ -106,6 +133,35 @@ protected:
     uint8_t mask;
 };
 
+class DX21TactileRxData
+{
+public:
+    using PTR = std::shared_ptr<DX21TactileRxData>;
+public:
+    DX21TactileRxData() = delete;
+    virtual ~DX21TactileRxData() = default;
+
+    [[nodiscard]] DEXHAND_API virtual uint16_t getTactileValue(uint8_t tacIndex)const = 0;
+    [[nodiscard]] DEXHAND_API virtual TactilePart021Pro getTactilePart()const = 0;
+    [[nodiscard]] DEXHAND_API virtual uint8_t getTactileNum()const = 0;
+    //TODO other interface
+
+protected:
+    DX21TactileRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp, int16_t type);
+    [[nodiscard]] bool isFullFill() const;
+
+public:
+    uint8_t deviceId;
+    uint8_t channelId;
+    int16_t statusType;
+    int64_t timestamp;
+
+protected:
+    uint8_t mask;
+
+};
+
+typedef std::function<void (const Dex021::DX21TactileRxData*)> DH21ProTactileRxCallBack;
 typedef std::function<void (const Dex021::DX21StatusRxData *)> DH21StatusRxCallBack;
 typedef std::function<void (const DexRobot::ErrorMessageRx *)> ErrorMessageCallBack;
 typedef std::function<void (const DexRobot::SysParameterRWRx *)> ParamRwMessageCallBack;
@@ -528,10 +584,13 @@ protected:
 public:
     friend class DexHand_021;
     friend class DexHand_021S;
+    friend class DexHand_021Pro;
     friend class PredefinedGestures<DexHand_021>;
     friend class PredefinedGestures<DexHand_021S>;
+    friend class PredefinedGestures<DexHand_021Pro>;
     friend class DexHandAdmin<DexHand_021>;
     friend class DexHandAdmin<DexHand_021S>;
+    friend class DexHandAdmin<DexHand_021Pro>;
 
 protected:
     AdapterType adapterType;
@@ -544,7 +603,7 @@ protected:
     void *hermes;
 
 private:
-    std::map<const AdapterChannel, uint8_t> handIds;
+    std::map<const AdapterChannel, uint8_t> handIds;//Save <channel,hand type(0:left;1:right;0xFF:unknown)>
 };
 
 class DexHand_021 : public DexHand
@@ -824,7 +883,6 @@ public:
 
 private:
 };
-
 
 class DexHand_021S : public DexHand
 {
@@ -1187,32 +1245,141 @@ private:
     std::shared_ptr<RTU485Impl> rtu485Impl;
 };
 
-/*
-class DexHand_021Pro final : public DexHand
+//Note: 021pro does not use DeviceId and will all be changed to HandId
+class DexHand_021Pro : public DexHand
 {
 public:
     using PTR = std::shared_ptr<DexHand_021Pro>;
 
 public:
     DexHand_021Pro() = delete;
-    DexHand_021Pro(AdapterType adapter, uint8_t adpaterIndex, bool listen=true);
+    DEXHAND_API DexHand_021Pro(AdapterType adapter, uint8_t adpaterIndex, bool listen=true);
     ~DexHand_021Pro() override;
 
-    bool connect() override;
-    bool disconnect() override;
+    //Override of pure virtual function
+    DEXHAND_API bool connect(bool listen) override;
+    DEXHAND_API bool disconnect() override;
+    
+    DEXHAND_API uint32_t getFirmwareVersion(uint8_t handId, uint8_t fingerId) override;
 
-    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallback &) const override;
-    DEXHAND_API void setErrorRxCallback(const ErrorMessageCallBack &) const override;
-    DEXHAND_API void setParamRWCallback(const ParamRwMessageCallBack &) const override;
+    DEXHAND_API bool setSafeCurrent(uint8_t handId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxCurrent) override;//dummy implementation
+    DEXHAND_API uint16_t getSafeCurrent(uint8_t handId, uint8_t fingerId, uint8_t jointPosition) override;//dummy implementation
+    DEXHAND_API bool setSafePressure(uint8_t handId, uint8_t fingerId, uint8_t jointPosition, uint8_t maxPressure) override;//dummy implementation
+    DEXHAND_API [[nodiscard]] uint8_t getSafePressure(uint8_t handId, uint8_t fingerId, uint8_t jointPosition) override;//dummy implementation
+    DEXHAND_API bool setSafeTemperature(uint8_t handId, uint8_t fingerId, uint8_t jointPosition, uint8_t maxTemperature) override;//dummy implementation
+    DEXHAND_API uint8_t getSafeTemperature(uint8_t handId, uint8_t fingerId, uint8_t jointPosition) override;//dummy implementation
 
-    * Get the prooduct type of this hand instance.
-    * @return Always ProductType::DX021_PRO
+    //Current maximum supported sampling rate: 100Hz
+    DEXHAND_API bool setRealtimeResponse(uint8_t handId, uint8_t fingerId, uint16_t sampleRate, bool enable) override;
+    DEXHAND_API bool setRealtimeResponse(uint8_t handId, uint16_t sampleRate, bool enable) override;
+    DEXHAND_API bool setRealtimeResponse(uint16_t sampleRate, bool enable) override;
+
+    DEXHAND_API bool moveFinger(uint8_t handId, uint8_t fingerId, uint8_t jointPosition, int16_t distValue, int16_t proxValue, MotorControlMode mode, int32_t delay) override;
+    DEXHAND_API bool moveFinger(uint8_t handId, uint8_t fingerId, uint8_t jointPosition, int16_t distValue, int16_t proxValue, MotorControlMode mode) override;
+
+
     DEXHAND_API [[nodiscard]] ProductType productType() const override;
 
-private:
-    void * hermes;
-};
-*/
+    DEXHAND_API [[nodiscard]] bool isAlive(AdapterChannel channel, uint8_t fingerId) override;
 
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t>& sysIdList) override;
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t>& sysIdList, uint32_t timeout = 30);
+
+    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallBack& callback) const override;
+    DEXHAND_API void setTactileRxCallback(const DH21ProTactileRxCallBack callback)const;
+    DEXHAND_API void setErrorRxCallback(const ErrorMessageCallBack& callback) const override;
+    DEXHAND_API void setParamRWCallback(const ParamRwMessageCallBack& callback) const override;
+
+    DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) override;
+    DEXHAND_API void clearFirmwareError(uint8_t handId, uint8_t fingerId) override;
+
+    DEXHAND_API void rebootDevice(AdapterChannel channel, uint8_t fingerId) override;
+
+    DEXHAND_API void resetJoints(AdapterChannel channel) override;
+    DEXHAND_API void resetJoints(uint8_t handId) override;
+
+
+    //Override of virtual function
+    DEXHAND_API [[nodiscard]] uint8_t handID(AdapterChannel channel) override;
+
+    //Member function
+    //021Pro Overall control
+    DEXHAND_API bool moveMultipleFingers_Pro(uint8_t handId, const HandControlDesc_Pro& data);
+
+    //Query the tactile sensor value of the current finger£¨Current maximum supported sampling rate: 50Hz£©
+    DEXHAND_API bool setRealtimeResponse_tactile(AdapterChannel channel, uint16_t sampleRate, bool enable);
+
+    //Restart the device and return a bool value
+    DEXHAND_API bool tryRebootDevice(AdapterChannel channel, uint8_t fingerId);
+protected:
+
+private:
+    //Auxiliary Functions and Variables for Finger State Data Query
+    struct ChannelPollingData {
+        std::unique_ptr<std::thread> pollingThread;
+        std::atomic<bool> pollingEnabled{ false };
+        std::atomic<bool> stopPolling{ false };
+
+        //Key: handId (the hand ID under this channel), value: the set of fingers that need to be queried for this hand
+        std::unordered_map<uint8_t, std::set<uint8_t>> handFingers;
+
+        std::atomic<uint16_t> sampleRate{ 100 };
+        std::mutex mutex;
+        uint8_t channelId;
+    };
+
+    std::unordered_map<uint8_t, std::shared_ptr<ChannelPollingData>> channelDataMap;//Dynamic channel data (up to 3)
+    std::mutex channelMapMutex;
+    static constexpr uint8_t MAX_CHANNELS = 3;
+
+    void pollingLoop(std::shared_ptr <ChannelPollingData> data);
+
+    void sendQueryCommand(uint8_t channelId, uint8_t handId, uint8_t fingerId);
+
+    std::shared_ptr<ChannelPollingData> getOrCreateChannelData(uint8_t channelId);
+
+    uint8_t getChannelId(uint8_t handId);
+
+    void updateChannelPollingState(std::shared_ptr<ChannelPollingData> data);
+
+    void stopChannelPolling(uint8_t channelId);
+
+    void stopAllChannelPolling();
+    //~Auxiliary Functions and Variables for Finger State Data Query
+
+
+    //Tactile data query auxiliary functions and variables
+    struct TactilePollingData {
+        std::unique_ptr<std::thread> pollingThread;
+        std::atomic<bool> pollingEnabled{ false };
+        std::atomic<bool> stopPolling{ false };
+        std::atomic<uint16_t> sampleRate{ 50 };//Default 50Hz (a total of 16 addresses need to be queried -8 on the wrist and 6 on the fingers)
+        std::mutex mutex;
+        AdapterChannel channel;
+        //Store the tactile sensor configuration that needs to be queried for this channel
+        //Pair: (ecId, address range)
+        std::vector<std::pair<uint8_t, std::pair<uint8_t, uint8_t>>> tactileConfigs;
+
+        TactilePollingData() : pollingThread(nullptr), pollingEnabled(false),
+            stopPolling(false), sampleRate(50), channel(AdapterChannel::CHNX) {
+            tactileConfigs.clear();
+        }
+    };
+
+    std::unordered_map<AdapterChannel, std::unique_ptr<TactilePollingData>> tactilePollingDataMap;
+    std::mutex tactileMapMutex;
+    static constexpr uint8_t MAX_TACTILE_CHANNELS = 3;
+
+    void tactilePollingLoop(TactilePollingData* data);
+
+    void sendTactileQueryCommand(AdapterChannel channel, uint8_t ecId, uint8_t addr);
+
+    TactilePollingData* getOrCreateTactileData(AdapterChannel channel);
+
+    void updateTactilePollingState(TactilePollingData* data);
+
+    void initTactileConfigForChannel(AdapterChannel channel, TactilePollingData* data);
+    //~Tactile data query auxiliary functions and variables
+};
 }
 }

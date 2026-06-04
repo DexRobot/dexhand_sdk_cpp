@@ -260,7 +260,7 @@ typedef union ControlParams_t
 
 typedef struct FingerControlData_t
 {
-    uint16_t DistPos;
+    uint16_t DistPos;//remote end
     uint16_t ProxPos;
     uint16_t DistSpd;
     uint16_t ProxSpd;
@@ -281,5 +281,106 @@ typedef struct HandControlDesc_t
     FingerControlData ring;
     FingerControlData little;
 } HandControlDesc;
+
+//sxl add.
+enum class FingerID_Pro
+{
+    //left hand(0x0x)
+    NONE_ID = 0xFF,
+    ENTIRE_HAND = 0x00,
+    LEFT_THUMB__REMOTE_NEAR = 0x01,
+    LEFT_THUMB__ROTATE_BEND = 0x02,
+    LEFT_INDEX__OPENCLOSE_BEND = 0x03,
+    LEFT_MIDDLE__OPENCLOSE_BEND = 0x04,
+    LEFT_RING__OPENCLOSE_BEND = 0x05,
+    LEFT_PINKY__OPENCLOSE_BEND = 0x06,
+    LEFT_REMOT__INDEX_MIDDLE = 0x07,
+    LEFT_REMOT__RING_PINKY = 0x08,
+    LEFT_WRIST_EC = 0x09,
+    LEFT_OPISTHENAR_EC = 0x0a,
+
+    //right hand(0x1x)
+    RIGHT_THUMB__REMOTE_NEAR = 0x11,
+    RIGHT_THUMB__ROTATE_BEND = 0x12,
+    RIGHT_INDEX__OPENCLOSE_BEND = 0x13,
+    RIGHT_MIDDLE__OPENCLOSE_BEND = 0x14,
+    RIGHT_RING__OPENCLOSE_BEND = 0x15,
+    RIGHT_PINKY__OPENCLOSE_BEND = 0x16,
+    RIGHT_REMOT__INDEX_MIDDLE = 0x17,
+    RIGHT_REMOT__RING_PINKY = 0x18,
+    RIGHT_WRIST_EC = 0x19,
+    RIGHT_OPISTHENAR_EC = 0x1a,
+};
+
+enum class ControlMode_Pro
+{
+    JOINT_MODE = 0x04,
+    TORQUE_MODE = 0x06,
+    IMPEDANCE_MODE = 0x07
+};
+
+enum MotorEnable_Pro
+{
+    ENABLE_MOTOR1 = 0x01,
+    ENABLE_MOTOR2 = 0x02,
+    ENABLE_ALL = 0x03
+};
+
+struct FramewareVer
+{
+    uint8_t patch;  // 6 bits for patch            (high)
+    uint8_t minor;  // 5 bits for minor version
+    uint8_t major;  // 5 bits for major version    (low)
+};
+
+typedef union ControlEnableMap_Pro_t
+{
+    uint16_t mask;
+
+    struct
+    {
+        uint8_t PinkyRotate2 : 1;
+        uint8_t PinkyRotate1 : 1;
+        uint8_t RINGRotate2 : 1;
+        uint8_t RINGRotate1 : 1;
+        uint8_t THUMBRotate2__MiddleRotate2 : 1;
+        uint8_t THUMBRotate1__MiddleRotate1 : 1;
+        uint8_t ThumbMid__IndexRotate2 : 1;
+        uint8_t ThumbDist__IndexRotate1 : 1;
+        uint8_t Reserved : 4;
+        uint8_t LttleRemo : 1;
+        uint8_t RingDist : 1;
+        uint8_t MiddleRemo : 1;
+        uint8_t IndexDist : 1;
+    } enables;
+} ControlEnableMap_Pro;
+
+typedef union ControlParams_Pro_t
+{
+    uint8_t mask;
+
+    struct
+    {
+        uint8_t HandType : 1;  // 0 for left hand, 1 for right hand
+        uint8_t Feedback : 1;  // 0 for disable feedback, 1 for enable
+        uint8_t ClearErr : 1;  // 0 for do NOT clear error automatically, 1 for clear
+        uint8_t HandCtrl : 1;  // 0 for thumb,1 for four fingers
+        uint8_t Reserved : 4;
+    } params;
+} ControlParameter_Pro;
+
+typedef struct HandControlDesc_Pro_t
+{
+    MotorControlMode  mode;
+    ControlEnableMap_Pro  enableMap;
+    ControlParameter_Pro  controlParam;
+    FingerControlData thumbMid__indexDist;    //Thumb far middle end data/index finger near end data
+    FingerControlData thumbDist__middleDis;   //Thumb proximal data/Middle finger proximal data
+    FingerControlData ringDist;
+    FingerControlData littleDist;
+    FingerControlData indexRemo_middleRemo;
+    FingerControlData ringRemo_littleRemo;
+} HandControlDesc_Pro;
+//end.
 
 }
