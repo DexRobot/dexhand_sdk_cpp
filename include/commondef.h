@@ -5,7 +5,6 @@
 
 #ifdef WIN32
 #include <windows.h>
-#include <typedef.h>
 #else
 #endif
 
