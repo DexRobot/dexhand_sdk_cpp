@@ -247,7 +247,7 @@ public:
     DEXHAND_API virtual bool setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
                                              uint8_t maxPressure) = 0;
 
-    [[nodiscard]] DEXHAND_API virtual uint8_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) = 0;
+    [[nodiscard]] DEXHAND_API virtual uint16_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) = 0;
 
     /*
     * @brief Set the safe value of working temperature(maximum allowed) of an indicated finger or motor. Continuous long time
@@ -703,7 +703,7 @@ public:
     DEXHAND_API bool
     setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint8_t maxPressure) override;
 
-    [[nodiscard]] DEXHAND_API uint8_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
+    [[nodiscard]] DEXHAND_API uint16_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
 
     /*
     * @brief Set the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand021 device.
@@ -1044,7 +1044,7 @@ public:
     * @brief DexHand-021S does NOT support this API yet, call of this function returns 0 always.
     * @return Always 0.
      */
-    [[nodiscard]] DEXHAND_API uint8_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
+    [[nodiscard]] DEXHAND_API uint16_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
 
     /*
     * @brief Set the safe value of working temperature(maximum allowed) for specified finger or motor of your DexHand-021S device.
