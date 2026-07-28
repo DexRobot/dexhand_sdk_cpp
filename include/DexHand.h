@@ -245,7 +245,7 @@ public:
     * @return true for success, false for failure.
      */
     DEXHAND_API virtual bool setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
-                                             uint8_t maxPressure) = 0;
+                                             uint16_t maxPressure) = 0;
 
     [[nodiscard]] DEXHAND_API virtual uint16_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) = 0;
 
@@ -701,7 +701,7 @@ public:
     * @return true for success, false for failure.
     */
     DEXHAND_API bool
-    setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint8_t maxPressure) override;
+    setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxPressure) override;
 
     [[nodiscard]] DEXHAND_API uint16_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
 
@@ -1038,7 +1038,7 @@ public:
     * @return Always false.
      */
     DEXHAND_API bool
-    setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint8_t maxPressure) override;
+    setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxPressure) override;
 
     /*
     * @brief DexHand-021S does NOT support this API yet, call of this function returns 0 always.
