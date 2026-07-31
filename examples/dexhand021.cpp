@@ -3,7 +3,9 @@
 #include <chrono>
 #include <thread>
 #include <cstring>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <signal.h>
 #include <sys/types.h>
 
