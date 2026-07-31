@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cstring>
+#include <chrono>
+#include <thread>
 #include "DexHand.h"
 #include "StringUtils.h"
 
@@ -81,7 +83,7 @@ void show_usage()
     std::cout << "\t-l, optional, use for whether listening to realtime response or not" << std::endl;
 }
 
-void CANFDTest(const AdapterType atype, bool bListen)
+void CANFDTest(const Dex021::AdapterType atype, bool bListen)
 {
     const auto device = DexHand::createInstance(ProductType::DX021_S, atype, 0);
     const auto hand = std::dynamic_pointer_cast<DexHand_021S>(device);
@@ -120,13 +122,13 @@ void CANFDTest(const AdapterType atype, bool bListen)
         hand->moveFinger(deviceId, 0x02, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->moveFinger(deviceId, 0x03, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->clearFirmwareError(deviceId, 0x00);
-        usleep(1000*1500);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
         hand->moveFinger(deviceId, 0x01, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->moveFinger(deviceId, 0x02, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->moveFinger(deviceId, 0x03, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->clearFirmwareError(deviceId, 0x00);
-        usleep(1000*1500);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     }
 
     hand->resetJoints(deviceId);
@@ -169,13 +171,13 @@ void RTU485Test(const std::string & portName)
         hand->moveFinger(deviceId, 0x02, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->moveFinger(deviceId, 0x03, 0x03, 1200, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->clearFirmwareError(deviceId, 0x00);
-        usleep(1000*1500);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
         hand->moveFinger(deviceId, 0x01, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->moveFinger(deviceId, 0x02, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->moveFinger(deviceId, 0x03, 0x03, 0, 1000, HALL_POSLIMIT_CONTROL_MODE, 10);
         hand->clearFirmwareError(deviceId, 0x00);
-        usleep(1000*1500);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     }
 
     hand->resetJoints(deviceId);
@@ -185,7 +187,7 @@ void RTU485Test(const std::string & portName)
 int main(int argc, const char ** argv)
 {
     bool bListen = false;
-    AdapterType atype;
+    Dex021::AdapterType atype;
 
     if(argc != 3 && argc != 2)
     {
