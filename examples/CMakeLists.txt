@@ -19,6 +19,7 @@ include_directories(${INCLUDE_DIRS})
 
 file(GLOB DX21_SOURCES ./dexhand021.cpp)
 file(GLOB DX21S_SOURCES ./dexhand021s.cpp)
+file(GLOB DX21Lite_SOURCES ./dexhand021Lite.cpp)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O2 -g -ggdb -pthread")
@@ -42,6 +43,7 @@ endif()
 
 ADD_EXECUTABLE(dexhand021  ${DX21_SOURCES})
 ADD_EXECUTABLE(dexhand021s ${DX21S_SOURCES})
+ADD_EXECUTABLE(dexhand021Lite ${DX21Lite_SOURCES})
 
 target_include_directories(dexhand021  PUBLIC ${INCLUDE_DIRS})
 target_include_directories(dexhand021s PUBLIC ${INCLUDE_DIRS})
@@ -49,6 +51,7 @@ target_include_directories(dexhand021s PUBLIC ${INCLUDE_DIRS})
 if(WIN32)
     target_link_libraries(dexhand021  PUBLIC ${DEPEND_LIB_DIR}/dexhand.lib ${DEPEND_LIB_DIR}/zlgcan.lib)
     target_link_libraries(dexhand021s PUBLIC ${DEPEND_LIB_DIR}/dexhand.lib ${DEPEND_LIB_DIR}/zlgcan.lib)
+    target_link_libraries(dexhand021Lite PUBLIC ${DEPEND_LIB_DIR}/dexhand.lib ${DEPEND_LIB_DIR}/zlgcan.lib)
 else()
     target_link_libraries(dexhand021 PUBLIC ${DEPEND_LIB_DIR}/libusb-1.0.so)
     target_link_libraries(dexhand021 PUBLIC ${DEPEND_LIB_DIR}/libusbcanfd.so)

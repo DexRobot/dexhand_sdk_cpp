@@ -9,6 +9,13 @@
 #include <string>
 #include <functional>
 #include "commondef.h"
+#include <set>
+#include <thread>
+#include <chrono>
+#include <algorithm>
+#include <unordered_map>
+#include <atomic>
+#include <mutex>
 
 #define DX21_DEFAULT_DEVICE_ID 1
 
@@ -26,12 +33,15 @@ namespace Dex021
 
 class DexHand_021;
 class DexHand_021S;
+class DexHand_021Pro;
+class DexHand_021Lite;
 
 enum class ProductType : int
 {
     UNSUPPORTED = -1,
     DX021,
     DX021_S,
+    DX021_LITE,
     DX021_PRO,
 };
 
@@ -58,6 +68,12 @@ enum class AdapterChannel : int
     CHN2,
     CHN3,
 };
+
+///
+/// DexHand-021Pro specific types (TactilePart021Pro, DX21TactileRxData,
+/// DH21ProTactileRxCallBack, DexHand_021Pro) have been moved to DexHandPro.h,
+/// an internal-only header not shipped to customers.
+///
 
 class DX21StatusRxData
 {
@@ -92,6 +108,8 @@ public:
     [[nodiscard]] DEXHAND_API virtual int16_t PWMValue() const = 0;
     [[nodiscard]] DEXHAND_API virtual int32_t ChipsetTemperature() const = 0;
 
+    [[nodiscard]] DEXHAND_API virtual int16_t MotorIdCurrent(uint8_t subDeviceId) const {return 0;}
+    [[nodiscard]] DEXHAND_API virtual uint16_t MotorErrorStatus(uint8_t subDeviceId) const {return 0;}
 protected:
     DX21StatusRxData(uint8_t channel, uint8_t deviceId, int64_t timestamp, int16_t type);
     [[nodiscard]] bool isFullFill() const;
@@ -153,7 +171,7 @@ public:
 
 public:
     DexHand() = delete;
-    virtual ~DexHand() = default;
+    virtual ~DexHand();
 
     /*
      * @brief Factory method to create an interactable instance of specific type of DexHand product, like DexHand_021,
@@ -173,6 +191,7 @@ public:
     */
     DEXHAND_API static PTR createInstance(ProductType productType=ProductType::DX021_S, const char * serialPortName="/dev/ttyUSB0");
 
+    DEXHAND_API static PTR createInstance(ProductType productType, const char * serialPortName, BaudRate baudRate);
     /*
      * @brief Get the number of connected DexHand devices on the adapter of this instance.
      * @return The number of workable DexHand devices.
@@ -422,20 +441,20 @@ public:
     * assigned by provider of the adapter.
     * @return Name of the adapter in text
      */
-    [[nodiscard]] DEXHAND_API const std::string &connAdapterName() const { return this->adapterName; }
+    [[nodiscard]] DEXHAND_API const std::string& connAdapterName() const;
 
     /*
     * @brief Get code of current error of this instance, if there is any. Normally if anything went wrong when creating
     * or starting the DexHand instance or adapter, error code will be set. This if for diagnostic purpose.
     * @return The code of current error.
      */
-    [[nodiscard]] DEXHAND_API SysErrorCode errorCode() const { return errCode; }
+    [[nodiscard]] DEXHAND_API SysErrorCode errorCode() const;
 
     /*
     * @brief Get detail message of current error.
     * @return Detail information in text of current error.
     */
-    [[nodiscard]] DEXHAND_API const std::string &errorMessage() const { return this->errMsg; }
+    [[nodiscard]] DEXHAND_API const std::string& errorMessage() const;
 
     /*
     * @brief Register a callback function for processing the status feedback data of DexHand. Status data contains several
@@ -525,26 +544,18 @@ protected:
     [[nodiscard]] std::map<const AdapterChannel, uint8_t> & devices();
     [[nodiscard]] const std::map<const AdapterChannel, uint8_t> & devices() const;
 
+    class DexHandImpl *impl = nullptr;
+
 public:
     friend class DexHand_021;
     friend class DexHand_021S;
+    friend class DexHand_021Pro;
     friend class PredefinedGestures<DexHand_021>;
     friend class PredefinedGestures<DexHand_021S>;
+    friend class PredefinedGestures<DexHand_021Pro>;
     friend class DexHandAdmin<DexHand_021>;
     friend class DexHandAdmin<DexHand_021S>;
-
-protected:
-    AdapterType adapterType;
-    uint8_t adpaterIndex;
-    std::string adapterName;
-
-    SysErrorCode errCode;
-    std::string errMsg;
-
-    void *hermes;
-
-private:
-    std::map<const AdapterChannel, uint8_t> handIds;
+    friend class DexHandAdmin<DexHand_021Pro>;
 };
 
 class DexHand_021 : public DexHand
@@ -823,8 +834,8 @@ public:
     DEXHAND_API [[nodiscard]] ProductType productType() const override;
 
 private:
+    class DexHand021Impl *pimpl = nullptr;
 };
-
 
 class DexHand_021S : public DexHand
 {
@@ -1183,36 +1194,374 @@ public:
     DEXHAND_API DX21StatusRxData::PTR HandStatus485();
 
 private:
-    class RTU485Impl;
-    std::shared_ptr<RTU485Impl> rtu485Impl;
+    class DexHand021SImpl *pimpl = nullptr;
 };
 
-/*
-class DexHand_021Pro final : public DexHand
+class DexHand_021Lite: public DexHand
 {
 public:
-    using PTR = std::shared_ptr<DexHand_021Pro>;
+    using PTR = std::shared_ptr<DexHand_021Lite>;
 
 public:
-    DexHand_021Pro() = delete;
-    DexHand_021Pro(AdapterType adapter, uint8_t adpaterIndex, bool listen=true);
-    ~DexHand_021Pro() override;
+    DexHand_021Lite() = delete;
 
-    bool connect() override;
-    bool disconnect() override;
+    /**
+    * @brief Constructer of this class to create an instance of DexHand-021Lite with a specific type of adapter, the supported
+    * adapter type includes USB2_485, LYS USBCANFD-Mini,currently only support USB2_485 adapter.
+    * @param adapterType The specific type of your adapter.
+    * @param adpaterIndex The index identified by system USB port of your adapter, start from 0.
+    * @param adapterName For RTU485 adapter only, if user uses RTU485 protocol to communicate with DexHand021Lite device.
+    * Normally, on linux, this is the serial port device name under /dev like ttyUSB0 or some other similar things.
+    * Normaaly, on Windows, it is the COM port name like COM1, COM2, etc.
+     */
+    DEXHAND_API DexHand_021Lite(AdapterType adapterType, uint8_t adpaterIndex, const char * adapterName="/dev/ttyUSB0", BaudRate baudRate= BaudRate::BAUD_921600);
 
-    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallback &) const override;
-    DEXHAND_API void setErrorRxCallback(const ErrorMessageCallBack &) const override;
-    DEXHAND_API void setParamRWCallback(const ParamRwMessageCallBack &) const override;
+    /**
+    * @brief Constructer create an instance of DexHand-021Lite device is connected to a serial port, particularly RTU485 adapter.
+    * @param adapterName The serial port name of your RTU485 adapter.
+    */
+    DEXHAND_API explicit DexHand_021Lite(const char * adapterName, BaudRate baudRate= BaudRate::BAUD_921600);
 
-    * Get the prooduct type of this hand instance.
-    * @return Always ProductType::DX021_PRO
-    DEXHAND_API [[nodiscard]] ProductType productType() const override;
+    ~DexHand_021Lite() override;
+
+    /**
+     * @brief  Establish connection between your program and the communication adapter with DexHand-021Lite device connected.
+     * @return true for success, false for failure.
+     * @param  listen Should be true: DexHand021Lite is request/response over 485,
+     * the receive thread must running to process responses.
+     */
+    DEXHAND_API bool connect(bool listen) override;
+
+    /**
+    * @brief Disconnect from the serial port.
+    * @return true for success, false for failure.
+    */
+    DEXHAND_API bool disconnect() override;
+
+    /**
+    * @brief Get the product type of this hand instance.
+    * @return Always ProductType::DX021_LITE.
+    */
+    [[nodiscard]] DEXHAND_API ProductType productType() const override;
+
+    /**
+     * @brief Register a callback of processing status feedback data.
+     * @param callback to be registered.
+     */
+    DEXHAND_API void setStatusRxCallback(const DH21StatusRxCallBack &callback) const override;
+
+    /**
+     * @brief Register a callback of processing error messages.
+     * @param callback to be registered.
+     */
+    DEXHAND_API void setErrorRxCallback(const ErrorMessageCallBack &callback) const override;
+
+    /**
+     * @brief Register a callback of processing the results of Read/Write firmware parameter.
+     * @param callback to be registered.
+     */
+    DEXHAND_API void setParamRWCallback(const ParamRwMessageCallBack &callback) const override;
+
+    // ---- Lite motion control ----
+    /**
+    * @brief Enable/Disable all 6 motors of the hand at once.
+    * @param deviceId Slave address of the hand.
+    * @param enableAll true to enable all motors, false to disable all motors.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool enable(uint8_t deviceId, bool enableAll);
+
+    /**
+    * @brief Move a single Finger(Motor) with full control data (0x10 write).
+    * @param deviceId Slave address of the hand.
+    * @param fingerId Finger index, 0~5: 0/1/2/3 = index/middle/ring/pinky, 4 = thumb bend, 5 = thumb rotate).
+    * @param mode Control mode, values CASCADED_PID_CONTROL_MODE(0x44) /
+    * HALL_POSLIMIT_CONTROL_MODE(0x55) / CASCADED_MIT_CONTROL_MODE(0x66).
+    * @param position  AimPos, valid in all modes.
+    * @param speed     AimSpd, valid in 0x55/0x66, ignored in 0x44.
+    * @param current   AimCur (0x55) / Toffset (0x66).
+    * @param p1        P1 / Kp, valid in 0x66 only.
+    * @param p2        P2 / Kd, valid in 0x66 only.
+    * @param delay     Delay before execution, in milliseconds.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, MotorControlMode mode,
+                               int16_t position, uint16_t speed, uint16_t current,
+                               uint16_t p1, uint16_t p2, int32_t delay = 10);
+
+    /**
+    * @brief move all fingers of the hand in one frame;
+    * The six joints are issued together instead of one by one;
+    * NOTICE: call enable(deviceId, true)first. Without it all the motors do not respond.
+    * @param deviceId Slave address of the hand.
+    * @param data Whole-frame control descriptor. data.joints[i] is motor i,
+    * same order as the motor data blocks (0 index .. 4 thumb bend, 5 thumb rotate).
+    * data.mode is shared by all 6 motors; which of the 5 fields are meaningful
+    * depends on the mode.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool moveMultipleFingers(uint8_t deviceId, const LiteHandControlDesc & data);
+
+    // ---- Lite parameter R/W ----
+    /**
+    * @brief Set SYS_ID of the hand.
+    * @param deviceId Slave address of the hand.
+    * @param newSysId New SYS_ID value.
+    */
+    DEXHAND_API bool setSysId(uint8_t deviceId, uint16_t newSysId);
+
+    /**
+    * @brief Set baud rate of the 485 bus.
+    * 0:115200, 1:230400, 2:460800, 3:921600, 4:1000000, 5:2000000
+    * NOTICE: the device switches baud after this, you must rebuild the instance on the new baud rate.
+    * @param deviceId Slave address of the hand.
+    * @param baudIndex Baud rate Index, 0~5.
+    * @param adapterType Transport whose baud rate is set. CANFD transports (ZLG_200U / ZLG_MINI /
+    * LYS_MINI) are not supported yet and the call returns false.
+    */
+    DEXHAND_API bool setBaudRate(uint8_t deviceId, uint8_t baudIndex, AdapterType adapterType = AdapterType::USB2_485);
+
+    /**
+    * @brief Set the protection temperature of one motor.
+    * @param deviceId Slave address of the hand.
+    * @param device Motor index, 0~5.
+    * @param temperature Protection temperature value.
+    */
+    DEXHAND_API bool setSafeTemperature(uint8_t deviceId, uint8_t device, uint16_t temperature);
+
+    /**
+    * @brief Get the protection temperature of one motor (0x03 read, blocking).
+    * @param deviceId Slave address of the hand.
+    * @param device Motor index, 0~5.
+    * @return The protection temperature, 0 if failed.
+    */
+    [[nodiscard]] DEXHAND_API uint16_t getSafeTemperature(uint8_t deviceId, uint8_t device);
+
+    /**
+    * @brief Clear errors of the hand.
+    * @param deviceId Slave address of the hand.
+    */
+    DEXHAND_API bool clearError(uint8_t deviceId);
+
+    /**
+    * @brief Restore factory defaults.
+    * @param deviceId Slave address of the hand.
+    */
+    DEXHAND_API bool restore(uint8_t deviceId);
+
+    /**
+    * @brief Poll the current status of all 6 motors.
+    * @param deviceId Slave address of the hand.
+    * @return Hand status snapshot carrying per-motor current / speed / hall
+    * data, nullptr if no motor responsed at all.
+    */
+    [[nodiscard]] DEXHAND_API DX21StatusRxData::PTR getHandStatus(uint8_t deviceId);
+
+    /**
+     * @brief Get thumb angles degree about 0x04 and 0x05.
+     * @param deviceId Slave address of the hand.
+     * @param thumbDegree Output. thumbDegree[0] = thumb bend angle(0x04),degree*100,
+     * thumbDegree[1] = thumb rotate angle(0x05),degree*100. signed, negative values are valid.
+     * @return true if the angles are retrieved, false if failed(array untouched).
+     */
+    DEXHAND_API bool getThumbDegree(uint8_t deviceId, int16_t thumbDegree[2]);
+
+    /**
+    * @brief Get the firmware version. Reads master and slave board app version.
+    * blocks until the response arrives or timeout.
+    * @param deviceId Slave address of the hand.
+    * @param fingerId Motor index 0~5. master is LITE_MASTER_VERSION.
+    * NOTE: fingerId = LITE_MASTER_VERSION is Master App Firmware Version,
+    * and fingerId = 0x00~0x05 is Slave App Firmware Version of one slave board.
+    * @return The firmware version, 0 if failed.
+    */
+    DEXHAND_API uint32_t getFirmwareVersion(uint8_t deviceId, uint8_t fingerId) override;
+
+    /**
+    * @brief Get the HandType of DexHand-021Lite.
+    * @param deviceId Slave address of the hand.
+    * @return Hand_Type raw value: 0x00 = left, 0x01 = right, 0x06 is not set.
+    */
+    [[nodiscard]] DEXHAND_API uint8_t getHandType(uint8_t deviceId);
+    /**
+    * @brief Convenience bridge for the generic DexHand interface. Maps fingerId to
+    * motor index, jointPosition ignored, current/p1/p2 forced to 0. Only meaningful
+    * for position based modes 0x04.
+    * NOTE: The override version of these two methods are not recommended.
+    */
+    DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
+                                int16_t controlArg1, int16_t controlArg2, MotorControlMode mode, int32_t delay) override;
+
+    DEXHAND_API bool moveFinger(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition,
+                                int16_t controlArg1, int16_t controlArg2, MotorControlMode mode) override;
+
+    /**
+    * @brief Confirm if the hand of given deviceId responds on the serial bus.
+    * @param channel Ignored.
+    * @param deviceId Slave address of the hand.
+    * @return True if the device answers the device-info read, false if not.
+    */
+    [[nodiscard]] DEXHAND_API bool isAlive(AdapterChannel channel, uint8_t deviceId) override;
+
+    /**
+    * @brief Discover ths slave address of the connected hand via broadcast slave address.
+    * Blocks until the SYS_ID response arrives or timeout.
+    * @param channel Ignored.
+    * @param sysIdList Output. Carries the slave address of the hand.
+    * NOTE: One hand can use only one 485 serial Port.
+    */
+    DEXHAND_API void getSysIds(AdapterChannel channel, std::vector<uint8_t> & sysIdList) override;
+
+    /**
+    * @brief Clear errors of the hand via the legacy channel based interface.
+    * The command is always sent to the default slave address (1).
+    * @param channel Ignored.
+    * @param fingerId Ignored.
+    */
+    DEXHAND_API void clearFirmwareError(AdapterChannel channel, uint8_t fingerId) override;
+
+    /**
+    * @brief Clear errors of the hand.
+    * @param deviceId Slave address of the hand.
+    * @param fingerId Ignored.
+    * NOTICE: the clear-error command is marked as "not implemented yet",
+    *  confirm with firmware before relying on it.
+    */
+    DEXHAND_API void clearFirmwareError(uint8_t deviceId, uint8_t fingerId) override;
+
+    /**
+    * @brief reboot device.
+    * @param channel Ignored.
+    * @param deviceId Slave address of the hand.
+    * @param mode WHOLE_CHAIN = reset the whole chain, SLAVE = reset the slave only.
+    */
+    DEXHAND_API void rebootDevice(AdapterChannel channel, uint8_t deviceId, LiteRebootMode mode);
+
+    /**
+     * @brief reboot deviceId with whole chain.
+     * @param channel Ignored.
+     * @param deviceId Slave address of the hand.
+     */
+    DEXHAND_API void rebootDevice(AdapterChannel channel, uint8_t deviceId) override;
+
+    /**
+    * @brief Reset all finger joints back to initial state position.
+    * @param channel Target channel of the Adapter,on which the DexHand021Lite device is connected.
+    */
+    DEXHAND_API void resetJoints(AdapterChannel channel) override;
+
+    /**
+    * @brief Reset all finger joints back to initial state position.
+    * @param deviceId DeviceID is slave address of the DexHand021Lite product.
+    */
+    DEXHAND_API void resetJoints(uint8_t deviceId) override;
+
+    /**
+    * @brief Legacy 4-argument override, delegates to setSafeTemperature(deviceId, device, temperature).
+    * @param deviceId Slave address of the hand.
+    * @param fingerId Motor index, 0~5.
+    * @param jointPosition Ignored.
+    * @param maxTemperature Protection temperature value.
+    * WARNING: the temperature is truncated to uint8_t here. this method is not recommended.
+    */
+    DEXHAND_API bool setSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint8_t maxTemperature) override;
+
+    /**
+    * @brief Legacy 3-argument override, delegates to getSafeTemperature(deviceId, device).
+    * @param deviceId Slave address of the hand.
+    * @param fingerId Motor index, 0~5.
+    * @param jointPosition Ignored.
+    * @return The protection temperature truncated to uint8_t, 0 if failed. this method is not recommended.
+    */
+    [[nodiscard]] DEXHAND_API uint8_t getSafeTemperature(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
+
+    /**
+     * @brief Read both of board temperature of the hand.
+     * @param deviceId Slave address of the hand.
+     * @param temperature Output. temperature[0] = sensor1, temperature[ 1] = sensor2
+     * Both are the raw reading scaled by 100 (2530 means 25.30).
+     * @return true if the values are retrieved, false if failed.
+     */
+    DEXHAND_API bool getTemperature(uint8_t deviceId, uint16_t temperature[2]);
+    /**
+     * @brief Read the finger-board online.
+     * Blocks until the response arrives or timeout.
+     * @param deviceId Slave address of the hand.
+     * @return Bit N = motor N, same order as the motor data blocks
+     * (0 index .. 5 thumb abduction): 0 = offline, 1 = online. bit6-7 reserved.
+     * Only bit0-5 are meaningful, mask with 0x3F before testing.
+     * 0xFFFF if the read failed (timeout / exception frame / CRC error).
+     * NOTE: check against 0xFFFF BEFORE masking, otherwise a failed read
+     * masked with 0x3F looks like "all boards online".
+     */
+    [[nodiscard]] DEXHAND_API uint16_t getSysStatus(uint8_t deviceId);
+
+    /**
+     * @brief Read the motor run/standby.
+     * Blocks until the response arrives or timeout.
+     * @param deviceId Slave address of the hand.
+     * @return Bit N = motor N, same order as SYS_S:
+     * 0 = running, 1 = standby. bit6-7 reserved. Mask with 0x3F.
+     * 0xFFFF if the read failed. Check the sentinel before masking.
+     */
+    [[nodiscard]] DEXHAND_API uint16_t getMotorStatus(uint8_t deviceId);
+
+    /**
+     * @brief Read the serial number.
+     * Read side needs no super-admin; the write side is admin-only.
+     * Blocks until the response arrives or timeout.
+     * @param deviceId Slave address of the hand.
+     * @return The serial number, empty string if the read failed.
+     */
+    [[nodiscard]] DEXHAND_API std::string getSerialNumber(uint8_t deviceId);
+
+    /**
+     * @brief Read Enable status of fingers via bitmap.
+     * Blocks until the response arrives or timeout.
+     * @param deviceId Slave address of the hand.
+     * @return Bit N = motor N, same order as SYS_S:
+     * 1 = enable, 0 = disable, bit6-7 reserved. Mask with 0x3F.
+     * 0xFFFF if the read failed, Check the sentinel  before masking.
+     */
+    [[nodiscard]] DEXHAND_API uint16_t getEnableStatus(uint8_t deviceId);
+
+    /**
+     * @brief Enable or disable realtime status collection for one hand.
+     * @param deviceId Slave address of the hand.
+     * @param fingerId ignored on DexHand021Lite.
+     * @param sampleRate Requested whole-hand refresh rate in Hz, about 3Hz maximum on RTU485.
+     * @param enable true fo start polling, Disableing always succeeds.
+     * @return false if enable is true and samplerate is 0; true otherwise.
+     */
+    DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint8_t fingerId, uint16_t sampleRate, bool enable) override;
+
+    /**
+     * @brief Enable or disable realtime status collection for one hand.
+     * @param deviceId Slave address of the hand.
+     * @param sampleRate Requested whole-hand refresh rate in Hz, about 3Hz maximum on RTU485.
+     * @param enable true fo start polling, Disableing always succeeds.
+     * @return false if enable is true and samplerate is 0; true otherwise.
+     */
+    DEXHAND_API bool setRealtimeResponse(uint8_t deviceId, uint16_t sampleRate, bool enable) override;
+
+    /**
+     * @brief Enable or disable realtime status collection for one hand.
+     * @param sampleRate Requested whole-hand refresh rate in Hz, about 3Hz maximum on RTU485.
+     * @param enable true fo start polling, Disableing always succeeds.
+     * @return false if enable is true and (sampleRate is 0 or no hand has been subscribed);
+     *         true otherwise. Disabling always succeeds.
+     */
+    DEXHAND_API bool setRealtimeResponse(uint16_t sampleRate, bool enable) override;
+
+    DEXHAND_API bool setSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxCurrent) override;
+    [[nodiscard]] DEXHAND_API uint16_t getSafeCurrent(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
+    DEXHAND_API bool setSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition, uint16_t maxPressure) override;
+    [[nodiscard]] DEXHAND_API uint16_t getSafePressure(uint8_t deviceId, uint8_t fingerId, uint8_t jointPosition) override;
+
 
 private:
-    void * hermes;
+    class DexHand021LiteImpl *pimpl = nullptr;
 };
-*/
 
 }
 }

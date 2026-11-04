@@ -6,6 +6,7 @@
 #ifdef WIN32
 #include <windows.h>
 #else
+#include <libserial/SerialPortConstants.h>
 #endif
 
 #define MAX_ERROR_MSG_LEN 255
@@ -159,6 +160,35 @@ enum class MotorErrorCode_21S : int32_t
     MOT_ERROR  = 0x0010,
 };
 
+enum class MotorErrorCode_021Lite : int32_t
+{
+    NONE_ERROR   = 0x0000, // 无错误
+    TEMPERATURE  = 0x0001, // bit0 温度
+    OVER_CURRENT = 0x0002, // bit1 过流
+    OVER_VOLTAGE = 0x0004, // bit2 过压
+    MOTOR_BLOCK  = 0x0008, // bit3 堵转
+    PHASE_LOSS   = 0x0010, // bit4 缺相
+    ANGLE_ERROR  = 0x0020, // bit5 角度
+    HALL_OFFSET    = 0x0040, // bit6 霍尔偏置错误
+    UNDER_VOLTAGE  = 0x0080, // bit7 欠压
+    SHORT_CIRCUIT  = 0x0100, // bit8 短路
+    OUT_OF_STEP    = 0x0200, // bit9 失步
+    ENCODER_ERROR  = 0x0400, // bit10 编码器错误
+    CURRENT_SAMPLE = 0x0800, // bit11 电流采样错误
+};
+
+enum class R485LiteErrorCode : uint8_t
+{
+    FUNC_CODE_ERR = 0x01,
+    ILLEGAL_ADDR  = 0x02,
+    ILLEGAL_DATA  = 0x03,
+    SLAVE_FAULT   = 0x04,
+    PROCESS_SLOW  = 0x05,
+    SLAVE_BUSY    = 0x06,
+    NO_RESPONSE   = 0x07,
+    NOT_ALLOWED   = 0x0B,
+};
+
 struct SysParameterRWRx
 {
     uint8_t channelId;
@@ -281,4 +311,43 @@ typedef struct HandControlDesc_t
     FingerControlData little;
 } HandControlDesc;
 
-}
+typedef struct ControlLoopArgs
+{
+    int16_t position;
+    uint16_t speed;
+    uint16_t current;
+    uint16_t p1;  // p1 / Kp
+    uint16_t p2;  // p2 / Kd
+}ControlLoopArgs;
+
+typedef struct LiteHandControlDesc_t
+{
+    MotorControlMode mode;
+    ControlLoopArgs  joints[6];   // index = motor: 0 index .. 4 thumb bend, 5 thumb rotate
+} LiteHandControlDesc;
+
+enum class LiteRebootMode : uint16_t
+{
+    WHOLE_CHAIN = 0x0000,
+    SLAVE       = 0x0001,
+};
+
+inline constexpr uint8_t LITE_MASTER_VERSION = 0xFF;
+
+#ifdef WIN32
+#undef BAUD_115200
+enum class BaudRate : uint32_t //位置待调整
+{
+    BAUD_115200  = 115200,
+    BAUD_230400  = 230400,
+    BAUD_460800  = 460800,
+    BAUD_921600  = 921600,
+    BAUD_1000000 = 1000000,
+    BAUD_2000000 = 2000000,
+};
+#else
+    using BaudRate = LibSerial::BaudRate;
+#endif
+
+
+}  // namespace DexRobot
