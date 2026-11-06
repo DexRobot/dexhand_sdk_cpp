@@ -1322,6 +1322,55 @@ public:
     DEXHAND_API bool setBaudRate(uint8_t deviceId, uint8_t baudIndex, AdapterType adapterType = AdapterType::USB2_485);
 
     /**
+    * @brief Return the four fingers to their zero position.
+    * After power-on the hand rejects motor control commands until both fingers and thumb are homed.
+    * @param deviceId Slave address of the hand.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool homeFingers(uint8_t deviceId);
+
+    /**
+    * @brief Return the thumb to its zero position.
+    * @param deviceId Slave address of the hand.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool homeThumb(uint8_t deviceId);
+
+    /**
+    * @brief Write the user-defined table entries.
+    * @param deviceId Slave address of the hand.
+    * @param regAddrs Register addresses mapped by the table, 1~32 entries.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool writeUserTable(uint8_t deviceId, const std::vector<uint16_t> & regAddrs);
+
+    /**
+    * @brief Read back the user-defined table entries.
+    * @param deviceId Slave address of the hand.
+    * @param count Number of entries to read, 1~32.
+    * @param regAddrs Output. Register addresses stored in the table.
+    * @return true on success.
+    */
+    DEXHAND_API bool readUserTable(uint8_t deviceId, uint16_t count, std::vector<uint16_t> & regAddrs);
+
+    /**
+    * @brief Read the register values mirrored by the user-defined table.
+    * @param deviceId Slave address of the hand.
+    * @param count Number of entries to read, 1~32.
+    * @param values Output. Values of the registers referenced by the table.
+    * @return true on success.
+    */
+    DEXHAND_API bool readUserTableValues(uint8_t deviceId, uint16_t count, std::vector<uint16_t> & values);
+
+    /**
+    * @brief Write register values through the user-defined table.
+    * @param deviceId Slave address of the hand.
+    * @param values Values written to the registers referenced by the table, 1~32 entries.
+    * @return true if the command is queued successfully.
+    */
+    DEXHAND_API bool writeUserTableValues(uint8_t deviceId, const std::vector<uint16_t> & values);
+
+    /**
     * @brief Set the protection temperature of one motor.
     * @param deviceId Slave address of the hand.
     * @param device Motor index, 0~5.
