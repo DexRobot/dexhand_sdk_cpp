@@ -47,6 +47,10 @@ void DX021Lite_RTU485_IFTests(const char* serialPort, BaudRate baud)
     else
         std::cout << "Device " << std::to_string(deviceId) << " not responding." << std::endl;
 
+    hand->homeThumb(deviceId);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    hand->homeFingers(deviceId);
+
     for (int i = 0; i <= 5; i++)
     {
         const auto v = hand->getFirmwareVersion(deviceId, i);
