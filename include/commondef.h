@@ -334,6 +334,82 @@ enum class LiteRebootMode : uint16_t
 
 inline constexpr uint8_t LITE_MASTER_VERSION = 0xFF;
 
+// DexHand021Lite user-defined table fields
+// Raw register value, transported as uint16_t.
+// - Int16 fields (ID_CURRENT / IQ_CURRENT / RPM / ANGLE_*_DEG): callers may
+//   reinterpret with static_cast<int16_t>(raw).
+// - Uint32 fields (SERIAL_NUMBER / APP_LENGTH / APP_CHECKSUM) are split into
+//   two entries; callers may combine the high and low 16-bit words into a single 32-bit value.
+enum class LiteMotorParam : uint8_t
+{
+    POS_KP              = 0x00,
+    POS_KI              = 0x01,
+    POS_KD              = 0x02,
+    POS_MAXOUT          = 0x03,
+    POS_MINOUT          = 0x04,
+    POS_MAXIOUT         = 0x05,
+    SPD_KP              = 0x06,
+    SPD_KI              = 0x07,
+    SPD_KD              = 0x08,
+    SPD_MAXOUT          = 0x09,
+    SPD_MINOUT          = 0x0A,
+    SPD_MAXIOUT         = 0x0B,
+    MOTOR_TYPE          = 0x0C,
+    SAFE_TEMP           = 0x0D,   // temperature * 100
+};
+
+enum class LiteMotorInput : uint8_t
+{
+    ID_CURRENT          = 0x00, //Int16
+    IQ_CURRENT          = 0x01, //Int16
+    RPM                 = 0x02, //Int16
+    HALL                = 0x03, //Uint16
+    HALL_EST            = 0x04, //Uint16
+    ERR_BIT             = 0x05, //Uint16
+};
+
+enum class LiteUserTableField : uint16_t
+{
+    DEVICE_TYPE,
+    MASTER_APP_VERSION,
+    SERIAL_NUMBER_HIGH,
+    SERIAL_NUMBER_LOW,
+    SLAVE0_APP_VERSION,
+    SLAVE1_APP_VERSION,
+    SLAVE2_APP_VERSION,
+    SLAVE3_APP_VERSION,
+    SLAVE4_APP_VERSION,
+    SLAVE5_APP_VERSION,
+
+    BAUD_RATE,
+    SYS_ID,
+    APP_LENGTH_HIGH,
+    APP_LENGTH_LOW,
+    APP_CHECKSUM_HIGH,
+    APP_CHECKSUM_LOW,
+
+    ANGLE_D4_DEG, //Int16
+    ANGLE_D5_DEG, //Int16
+    ANGLE_D4_RAW,
+    ANGLE_D5_RAW,
+    TEMP1,
+    TEMP2,
+    SYS_STATUS,
+    MOTOR_STATUS,
+};
+
+constexpr LiteUserTableField liteMotorParamField(const uint8_t motorId, const LiteMotorParam param)
+{
+    return static_cast<LiteUserTableField>(
+        0x0100u + 0x10u * motorId + static_cast<uint8_t>(param));
+}
+
+constexpr LiteUserTableField liteMotorInputField(const uint8_t motorId, const LiteMotorInput data)
+{
+    return static_cast<LiteUserTableField>(
+        0x0200u + 0x08u * motorId + static_cast<uint8_t>(data));
+}
+
 #ifdef WIN32
 #undef BAUD_115200
 enum class BaudRate : uint32_t //位置待调整

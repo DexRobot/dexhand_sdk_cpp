@@ -1339,36 +1339,29 @@ public:
     /**
     * @brief Write the user-defined table entries.
     * @param deviceId Slave address of the hand.
-    * @param regAddrs Register addresses mapped by the table, 1~32 entries.
-    * @return true if the command is queued successfully.
+    * @param table Field map: only the keys are used, the values are ignored.
+    * @return true if all frames were queued successfully.
     */
-    DEXHAND_API bool writeUserTable(uint8_t deviceId, const std::vector<uint16_t> & regAddrs);
+    DEXHAND_API bool writeUserTable(uint8_t deviceId, const std::map<LiteUserTableField, uint16_t> & table);
 
     /**
-    * @brief Read back the user-defined table entries.
+    * @brief Read the values mirrored by user-defined table.
     * @param deviceId Slave address of the hand.
-    * @param count Number of entries to read, 1~32.
-    * @param regAddrs Output. Register addresses stored in the table.
+    * @param values Field map: keys must be pre-filled with the configured fields.
+    * NOTE: values are raw register data (uint16_t). Signed fields
+    * (ID_CURRENT/ID_CURRENT/RPM/ANGLE_*_DEG) need static_cast<int16_t>
     * @return true on success.
     */
-    DEXHAND_API bool readUserTable(uint8_t deviceId, uint16_t count, std::vector<uint16_t> & regAddrs);
+    DEXHAND_API bool readUserTableValues(uint8_t deviceId, std::map<LiteUserTableField, uint16_t> & values);
 
     /**
-    * @brief Read the register values mirrored by the user-defined table.
+    * @brief Write values through the user-defined table.
+    * Read-only and administrator-only fields are rejected.
     * @param deviceId Slave address of the hand.
-    * @param count Number of entries to read, 1~32.
-    * @param values Output. Values of the registers referenced by the table.
-    * @return true on success.
-    */
-    DEXHAND_API bool readUserTableValues(uint8_t deviceId, uint16_t count, std::vector<uint16_t> & values);
-
-    /**
-    * @brief Write register values through the user-defined table.
-    * @param deviceId Slave address of the hand.
-    * @param values Values written to the registers referenced by the table, 1~32 entries.
+    * @param values Field map: all entries must be writable holding-register fields.
     * @return true if the command is queued successfully.
     */
-    DEXHAND_API bool writeUserTableValues(uint8_t deviceId, const std::vector<uint16_t> & values);
+    DEXHAND_API bool writeUserTableValues(uint8_t deviceId, const std::map<LiteUserTableField, uint16_t> & values);
 
     /**
     * @brief Set the protection temperature of one motor.

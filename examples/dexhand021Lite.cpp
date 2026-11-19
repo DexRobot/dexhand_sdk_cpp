@@ -80,6 +80,7 @@ void DX021Lite_RTU485_IFTests(const char* serialPort, BaudRate baud)
         {
             std::cout << "fingerId= " << static_cast<int>(fingerId)
                 << "  iq=" << status->MotorCurrent(fingerId)
+                << "  id=" <<status->MotorIdCurrent(fingerId)
                 << "  rpm=" << status->MotorVelocity(fingerId)
                 << "  hall=" << status->MotorHallValue(fingerId)
                 << "  err=0x" << std::hex << status->MotorErrorStatus(fingerId)
